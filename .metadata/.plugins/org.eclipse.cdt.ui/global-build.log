@@ -1208,3 +1208,7 @@ xmake -f .makefile all
 15:46:50 **** Incremental Build of configuration Default for project lib_xassert ****
 xmake -f .makefile all 
 ** Module only - only builds as part of application **
+17:01:19 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2

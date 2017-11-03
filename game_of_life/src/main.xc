@@ -84,17 +84,17 @@ void processWorker(chanend toDist, int index){
 //    int base = index*(IMHT/noWorkers);
 //    int interval = base + (IMHT/noWorkers);
     uchar outimg[IMWD][IMHT];
-    
+
     for(int y= 0;y< IMHT/noWorkers;y++){
         for(int x=0;x<IMWD;x++){
-            toDist :> outimg[x][y]; 
+            toDist :> outimg[x][y];
             liveNeighbours = getLiveNeighbours(outimg, x,y);
             if(img[x][y] == 255){
               if(liveNeighbours < 2) {
                   outimg[x][y] = img[x][y] ^ 0xFF;
               }
               else if(liveNeighbours > 3) {
-                  outimg[x][y] = img[x][y] ^ 0xFF;                      
+                  outimg[x][y] = img[x][y] ^ 0xFF;
               }
             }
             if(img[x][y] == 0) {
@@ -102,13 +102,13 @@ void processWorker(chanend toDist, int index){
             }
         }
     }
-    
+
     for (int y = 0; y<IMHT/noWorkers;y++){
         for(int x=0;x<IMWD;x++){
             toDist <: outimg[x][y];
         }
     }
-    
+
 //    for(int y = 0; y<IMHT/noWorkers;y++){
 //        for(int x =0; x < IMWD; x++){
 //            liveNeighbours = getLiveNeighbours(img, x,y);
@@ -117,13 +117,13 @@ void processWorker(chanend toDist, int index){
 //                  outimg[x][y] = img[x][y] ^ 0xFF;
 //              }
 //           else if(liveNeighbours > 3) {
-//               outimg[x][y] = img[x][y] ^ 0xFF;                      
+//               outimg[x][y] = img[x][y] ^ 0xFF;
 //               }
 //            }
 //          if(img[x][y] == 0) {
 //              if(liveNeighbours == 3) outimg[x][y] = 255;
 //          }
-//            
+//
 //        }
 //    }
 }
@@ -137,7 +137,7 @@ void processWorker(chanend toDist, int index){
 /////////////////////////////////////////////////////////////////////////////////////////
 void distributor(chanend c_in, chanend c_out, chanend fromAcc)
 {
-  
+
   chan toWorkers[noWorkers];
   uchar img[IMWD][IMHT];
   uchar outimg[IMWD][IMHT];
@@ -155,7 +155,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc)
   for( int y = 0; y < IMHT; y++ ) {   //go through all lines
     for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
       c_in :> img[x][y];                    //read the pixel value
-      
+
     }
   }
 
@@ -164,7 +164,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc)
           outimg[x][y] = img[x][y];
       }
   }
-  
+
 //  par{
 //      processWorker(toWorkers[0],0);
 //      processWorker(toWorkers[1],1);
@@ -179,17 +179,17 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc)
 //          }
 //      }
 //  }
-  
+
       par(int index = 0; index< noWorkers;index++){
           for(int y = index*(IMHT/noWorkers); y< index*(IMHT/noWorkers)+ IMHT/noWorkers;y++){
-              for(int x =0 ; x< IMWD;x++){ 
+              for(int x =0 ; x< IMWD;x++){
                   processworker(toworkers[index], index);
-                  toworker[index] <: img[x][y];  
+                  toworker[index] <: img[x][y];
               }
           }
       }
-  
-  
+
+
   for(int index =0; index<noWorkers;index++){
       int base = index*(IMHT/noWorkers);
       int interval = base + (IMHT/noWorkers);
@@ -200,7 +200,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc)
           }
       }
   }
-  
+
 //  for(int y= 0;y < IMHT; y++){
 //      for(int x=0;x<IMWD; x++){
 //          liveNeighbours = getLiveNeighbours(img, x,y);
@@ -264,7 +264,7 @@ void orientation( client interface i2c_master_if i2c, chanend toDist) {
   if (result != I2C_REGOP_SUCCESS) {
     printf("I2C write reg failed\n");
   }
-  
+
   // Enable FXOS8700EQ
   result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_CTRL_REG_1, 0x01);
   if (result != I2C_REGOP_SUCCESS) {
