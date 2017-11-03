@@ -1025,3 +1025,186 @@ xmake -f .makefile all
 13:58:30 **** Incremental Build of configuration Default for project lib_xassert ****
 xmake -f .makefile all 
 ** Module only - only builds as part of application **
+14:24:54 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:17:23 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:17:24 **** Incremental Build of configuration Default for project lib_i2c ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:17:24 **** Incremental Build of configuration Default for project lib_logging ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:17:24 **** Incremental Build of configuration Default for project lib_xassert ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:17:40 **** Clean-only build of configuration Default for project game_of_life ****
+xmake clean 
+/home/chetan/XMOS/xTIMEcomposer/Community_14.3.0/build/xcommon/module_xcommon/build/../build/Makefile.common1:646: *** Multiple copies of lib_i2c found: /home/chetan/Documents/XMOS/COMS20001/lib_i2c /home/chetan/Documents/XMOS/COMS20001vII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c//home/chetan/Documents/XMOS/COMS20001/lib_i2c /home/chetan/Documents/XMOS/COMS20001vII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c.  Stop.
+xmake: *** [clean_common] Error 2
+15:17:40 **** Clean-only build of configuration Default for project lib_i2c ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+15:17:41 **** Clean-only build of configuration Default for project lib_logging ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+15:17:41 **** Clean-only build of configuration Default for project lib_xassert ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+15:17:41 **** Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:17:41 **** Build of configuration Default for project lib_i2c ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:17:42 **** Build of configuration Default for project lib_logging ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:17:42 **** Build of configuration Default for project lib_xassert ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:17:44 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:22:23 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:22:23 **** Incremental Build of configuration Default for project lib_i2c ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:22:23 **** Incremental Build of configuration Default for project lib_logging ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:22:24 **** Incremental Build of configuration Default for project lib_xassert ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:22:25 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:22:45 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:27:07 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:40:15 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:40:55 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:41:34 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:41:52 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:43:19 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:43:53 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:44:16 **** Clean-only build of configuration Default for project game_of_life ****
+xmake clean 
+/home/chetan/XMOS/xTIMEcomposer/Community_14.3.0/build/xcommon/module_xcommon/build/../build/Makefile.common1:646: *** Multiple copies of lib_i2c found: /home/chetan/Documents/XMOS/COMS20001/lib_i2c /home/chetan/Documents/XMOS/COMS20001vII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c//home/chetan/Documents/XMOS/COMS20001/lib_i2c /home/chetan/Documents/XMOS/COMS20001vII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c.  Stop.
+xmake: *** [clean_common] Error 2
+15:44:16 **** Clean-only build of configuration Default for project lib_i2c ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+15:44:17 **** Clean-only build of configuration Default for project lib_logging ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+15:44:17 **** Clean-only build of configuration Default for project lib_xassert ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+15:44:17 **** Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:44:17 **** Build of configuration Default for project lib_i2c ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:44:18 **** Build of configuration Default for project lib_logging ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:44:18 **** Build of configuration Default for project lib_xassert ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:44:20 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:44:42 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:45:06 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:45:06 **** Incremental Build of configuration Default for project lib_i2c ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:45:07 **** Incremental Build of configuration Default for project lib_logging ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:45:07 **** Incremental Build of configuration Default for project lib_xassert ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:46:48 **** Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing main.xc
+../src/main.xc:74:11: warning: unused variable `data' [-Wunused-variable]
+    uchar data;
+          ^~~~
+../src/main.xc:119:9: warning: unused variable `img1' [-Wunused-variable]
+  uchar img1[16][8];
+        ^~~~~~~~~~~
+../src/main.xc:120:9: warning: unused variable `img2' [-Wunused-variable]
+  uchar img2[16][8];
+        ^~~~~~~~~~~
+Creating dependencies for main.xc
+Compiling main.xc
+../src/main.xc:74:11: warning: unused variable `data' [-Wunused-variable]
+    uchar data;
+          ^~~~
+../src/main.xc:119:9: warning: unused variable `img1' [-Wunused-variable]
+  uchar img1[16][8];
+        ^~~~~~~~~~~
+../src/main.xc:120:9: warning: unused variable `img2' [-Wunused-variable]
+  uchar img2[16][8];
+        ^~~~~~~~~~~
+Creating game_of_life.xe
+Build Complete
+15:46:49 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+15:46:50 **** Incremental Build of configuration Default for project lib_i2c ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:46:50 **** Incremental Build of configuration Default for project lib_logging ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+15:46:50 **** Incremental Build of configuration Default for project lib_xassert ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **

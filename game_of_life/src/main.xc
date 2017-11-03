@@ -9,6 +9,7 @@
 
 #define  IMHT 16                  //image height
 #define  IMWD 16                  //image width
+#define  noWorkers 2
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -64,21 +65,68 @@ int getLiveNeighbours(uchar img[IMHT][IMWD], int x, int y){
     int counter = 0;
     for(int j = -1; j<2; j++){
         for(int i =-1; i<2; i++){
-            int xneighbour = x+i ;
-            int yneighbour = y+j ;
-            if(xneighbour == -1) xneighbour = IMWD -1;
-            if(xneighbour == IMWD) xneighbour = 0;
-            if(yneighbour == -1) yneighbour = IMHT-1;
-            if(yneighbour == IMHT) yneighbour = 0;
+            int xneighbour = (x+i+IMWD) %IMWD ;
+            int yneighbour = (y+j+IMHT) %IMHT ;
+//            if(xneighbour == -1) xneighbour = IMWD -1;
+//            if(xneighbour == IMWD) xneighbour = 0;
+//            if(yneighbour == -1) yneighbour = IMHT-1;
+//            if(yneighbour == IMHT) yneighbour = 0;
             if((i != 0) || (j!=0)){
-            if (img[xneighbour][yneighbour] == 255) counter++;
-//            printf("x= %d y= %d \n",x,y);
+                if (img[xneighbour][yneighbour] == 255) counter++;
             }
         }
     }
     return counter;
 }
 
+
+void processWorker(chanend toDist, int index){
+//    int base = index*(IMHT/noWorkers);
+//    int interval = base + (IMHT/noWorkers);
+    uchar outimg[IMWD][IMHT];
+    
+    for(int y= 0;y< IMHT/noWorkers;y++){
+        for(int x=0;x<IMWD;x++){
+            toDist :> outimg[x][y]; 
+            liveNeighbours = getLiveNeighbours(outimg, x,y);
+            if(img[x][y] == 255){
+              if(liveNeighbours < 2) {
+                  outimg[x][y] = img[x][y] ^ 0xFF;
+              }
+              else if(liveNeighbours > 3) {
+                  outimg[x][y] = img[x][y] ^ 0xFF;                      
+              }
+            }
+            if(img[x][y] == 0) {
+                if(liveNeighbours == 3) outimg[x][y] = 255;
+            }
+        }
+    }
+    
+    for (int y = 0; y<IMHT/noWorkers;y++){
+        for(int x=0;x<IMWD;x++){
+            toDist <: outimg[x][y];
+        }
+    }
+    
+//    for(int y = 0; y<IMHT/noWorkers;y++){
+//        for(int x =0; x < IMWD; x++){
+//            liveNeighbours = getLiveNeighbours(img, x,y);
+//            if(img[x][y] == 255){
+//              if(liveNeighbours < 2) {
+//                  outimg[x][y] = img[x][y] ^ 0xFF;
+//              }
+//           else if(liveNeighbours > 3) {
+//               outimg[x][y] = img[x][y] ^ 0xFF;                      
+//               }
+//            }
+//          if(img[x][y] == 0) {
+//              if(liveNeighbours == 3) outimg[x][y] = 255;
+//          }
+//            
+//        }
+//    }
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -89,9 +137,10 @@ int getLiveNeighbours(uchar img[IMHT][IMWD], int x, int y){
 /////////////////////////////////////////////////////////////////////////////////////////
 void distributor(chanend c_in, chanend c_out, chanend fromAcc)
 {
-//  uchar val;
-  uchar img[IMHT][IMWD];
-  uchar outimg[IMHT][IMWD];
+  
+  chan toWorkers[noWorkers];
+  uchar img[IMWD][IMHT];
+  uchar outimg[IMWD][IMHT];
   int liveNeighbours;
 
   //Starting up and wait for tilting of the xCore-200 Explorer
@@ -115,20 +164,55 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc)
           outimg[x][y] = img[x][y];
       }
   }
-
-  for(int y= 0;y < IMHT; y++){
-      for(int x=0;x<IMWD; x++){
-          liveNeighbours = getLiveNeighbours(img, x,y);
-          if(img[x][y] == 255){
-              if(liveNeighbours < 2) {outimg[x][y] = img[x][y] ^ 0xFF;
-              }
-              else if(liveNeighbours > 3) {outimg[x][y] = img[x][y] ^ 0xFF;
+  
+//  par{
+//      processWorker(toWorkers[0],0);
+//      processWorker(toWorkers[1],1);
+//      for(int y =0; y<(IMHT/noWorkers); y++){
+//          for (int x = 0; x<IMWD;x++){
+//              toWorker[0] <: img[x][y];
+//          }
+//      }
+//      for(int y =8; y<IMHT; y++){
+//          for (int x = 0; x<IMWD;x++){
+//              toWorker[1] <: img[x][y];
+//          }
+//      }
+//  }
+  
+      par(int index = 0; index< noWorkers;index++){
+          for(int y = index*(IMHT/noWorkers); y< index*(IMHT/noWorkers)+ IMHT/noWorkers;y++){
+              for(int x =0 ; x< IMWD;x++){ 
+                  processworker(toworkers[index], index);
+                  toworker[index] <: img[x][y];  
               }
           }
-          if(img[x][y] == 0) {if(liveNeighbours == 3) outimg[x][y] = 255;}
-          c_out <: outimg[x][y];
+      }
+  
+  
+  for(int index =0; index<noWorkers;index++){
+      int base = index*(IMHT/noWorkers);
+      int interval = base + (IMHT/noWorkers);
+      for(int y = base; y< interval; y++){
+          for(int x = 0; x < IMWD; x++){
+              toWorkers[index] :> outimg[x][y];
+              c_out <: outimg[x][y];
+          }
       }
   }
+  
+//  for(int y= 0;y < IMHT; y++){
+//      for(int x=0;x<IMWD; x++){
+//          liveNeighbours = getLiveNeighbours(img, x,y);
+//          if(img[x][y] == 255){
+//              if(liveNeighbours < 2) {outimg[x][y] = img[x][y] ^ 0xFF;
+//              }
+//              else if(liveNeighbours > 3) {outimg[x][y] = img[x][y] ^ 0xFF;
+//              }
+//          }
+//          if(img[x][y] == 0) {if(liveNeighbours == 3) outimg[x][y] = 255;}
+//      }
+//  }
   printf( "\nOne processing round completed...\n" );
 }
 
