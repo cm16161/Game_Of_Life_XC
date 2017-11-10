@@ -50,9 +50,9 @@ void DataInStream(char infname[], chanend c_out)
     _readinline( line, IMWD );
     for( int x = 0; x < IMWD; x++ ) {
       c_out <: line[ x ];
-      printf( "-%4.1d ", line[ x ] ); //show image values
+//      printf( "-%4.1d ", line[ x ] ); //show image values
     }
-    printf( "\n" );
+//    printf( "\n" );
   }
 
   //Close PGM image file
@@ -61,30 +61,32 @@ void DataInStream(char infname[], chanend c_out)
   return;
 }
 
-//int getLiveNeighbours(uchar img[IMHT][IMWD], int x, int y){
-//    int counter = 0;
-//    for(int j = -1; j<2; j++){
-//        for(int i =-1; i<2; i++){
-//            int xneighbour = (x+i) ;
-//            int yneighbour = (y+j) ;
-//            if(xneighbour == -1) xneighbour = IMWD -1;
-//            if(xneighbour == IMWD) xneighbour = 0;
-//            if(yneighbour == -1) yneighbour = IMHT-1;
-//            if(yneighbour == IMHT) yneighbour = 0;
-//            if((i != 0) || (j!=0)){
-//                if (img[xneighbour][yneighbour] == 255) counter++;
-//            }
-//        }
-//    }
-//    return counter;
-//}
-
-int getLiveNeighbours(uchar img[3][3]){
+int getLiveNeighbours(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD],uchar bottom[IMWD], int x, int y){
     int counter = 0;
-    for (int y = 0; y<3; y++){
-        for(int x=0;x<3;x++){
-            if (x != 0 || y!= 0){
-                if(img[x][y] == 255) counter++;
+    int flagup =0;
+    int flagdown =0;
+    for(int j = -1; j<2; j++){
+        for(int i =-1; i<2; i++){
+            int xneighbour = (x+i) ;
+            int yneighbour = (y+j) ;
+            if(xneighbour == -1) xneighbour = IMWD -1;
+            if(xneighbour == IMWD) xneighbour = 0;
+            if(yneighbour == -1) {yneighbour = IMHT-1; flagup =1;}
+            if(yneighbour == IMHT/noWorkers) {yneighbour = 0; flagdown = 1;}
+            if((i != 0) || (j!=0)){
+                if(flagup){
+                    if(top[xneighbour] == 255) counter++;
+                    flagup =0;
+//                    printf("$top[%d] = %d\n", xneighbour,top[xneighbour]);
+                }
+                else if(flagdown){
+                    if(bottom[xneighbour] == 255) counter++;
+                    flagdown =0;
+//                    printf("$bottom[%d] = %d\n", xneighbour,bottom[xneighbour]);
+                }
+                else{
+                    if (img[xneighbour][yneighbour] == 255) counter++;
+                }
             }
         }
     }
@@ -92,19 +94,18 @@ int getLiveNeighbours(uchar img[3][3]){
 }
 
 
-void processWorker(chanend toDist, int index, chanend communication){
+void processWorker(chanend toDist, int index){
 //    int base = index*(IMHT/noWorkers);
 //    int interval = base + (IMHT/noWorkers);
     uchar img[IMWD][IMHT/noWorkers];
     uchar outimg[IMWD][IMHT/noWorkers];
-    uchar neighbours[3][3];
-    uchar flagVal;
-    int xrecieve, yrecieve;
-    int flag=0;
-    int sender =0;
+    uchar top[IMWD]; uchar bottom[IMWD];
     int liveNeighbours;
-    uchar dead;
-    if (index % 2 == 0) sender =1;
+    for (int x = 0; x <IMWD; x++){
+        toDist :> top[x];
+        toDist :> bottom[x];
+//        printf("$ top[%d], bottom[%d]\n", top[x],bottom[x]);
+    }
     for(int y= 0;y< IMHT/noWorkers;y++){
         for(int x=0;x<IMWD;x++){
             toDist :> img[x][y];
@@ -117,134 +118,11 @@ void processWorker(chanend toDist, int index, chanend communication){
         }
 //        printf("\n");
     }
-//    for(int y= 0; y< IMHT/noWorkers; y++){
-//        for(int x = 0; x< IMWD; x++){
-////            //printf("$Recieved some data\n");
-//            liveNeighbours = getLiveNeighbours(outimg, x,y);
-////            //printf("$liveNeighbours %d\n",liveNeighbours);
-//            if(outimg[x][y] == 255){
-//              if(liveNeighbours < 2) {
-//                  outimg[x][y] = outimg[x][y] ^ 0xFF;
-////                  //printf("$SOMETHING WORKS\n");
-//              }
-//              else if(liveNeighbours > 3) {
-//                  outimg[x][y] = outimg[x][y] ^ 0xFF;
-////                  //printf("$SOMETHING WORKS\n");
-//              }
-//            }
-//            if(outimg[x][y] == 0) {
-//                if(liveNeighbours == 3) outimg[x][y] = 255;
-////                //printf("$SOMETHING WORKS\n");
-//            }
-//        }
-//    }
+
     for(int y = 0; y<IMHT/noWorkers;y++){
         for(int x =0; x < IMWD; x++){
-            for(int j = -1; j<2; j++){
-                for(int i =-1; i<2; i++){
-                    int xneighbour = (x+i) ;
-                    int yneighbour = (y+j) ;
-                    if(xneighbour == -1) xneighbour = IMWD -1;
-                    if(xneighbour == IMWD) xneighbour = 0;
-
-
-                    if(yneighbour == -1) {
-                        yneighbour = IMHT/noWorkers-1;
-                        flag =1;
-
-                    }
-                    if(yneighbour == IMHT/noWorkers) {
-                        yneighbour = 0;
-                        flag =1;
-                    }
-//                    if (flag){
-//                        communication <: xneighbour;
-//                        communication <: yneighbour;
-//                        communication :> flagVal;
-//                    }
-                    ///WHERE flagVal = img[xneighbour][yneighbour]
-//                    printf("$j=%d, i=%d\n",j,i);
-//                    printf("$xneighbour = %d yneighbour = %d\n",xneighbour,yneighbour);
-//                    printf("$test\n");
-                    neighbours[j+1][i+1] = outimg[xneighbour][yneighbour];
-                    if (sender){
-//                        communication <: flag;
-//                        communication :> flagSend;
-                        if (flag){
-                            communication <: xneighbour;
-                            communication <: yneighbour;
-                            communication :> flagVal;
-                            neighbours[j+1][i+1] = flagVal;
-//                            printf("$sender flag true, flagVal = %d\n",flagVal);
-                            flag = 0;
-                        }
-//                        if (flagSend){
-//                            communication :> xneighbour;
-//                            communication :> yneighbour;
-//                            communication <: img[xneighbour][yneighbour];
-//                            flagSend = 0;
-//                        }
-                        else {
-                            communication <: 0;
-                            communication <: 0;
-                            communication :> dead;
-                        }
-                        communication :> xrecieve;
-                        communication :> yrecieve;
-                        communication <: img[xrecieve][yrecieve];
-                    }
-                    else {
-//                        communication :> flagSend;
-//                        communication <: flagRecieve;
-//                        if (flag){
-                            communication :> xrecieve;
-                            communication :> yrecieve;
-                            communication <: img[xrecieve][yrecieve];
-//                            neighbours[j+1][i+1] = flagVal;
-//                            flagRecieve = 0;
-//                        }
-//                        if (flagSend){
-//                            communication :> xneighbour;
-//                            communication :> yneighbour;
-//                            communication <: img[xneighbour][yneighbour];
-//                            flagSend = 0;
-//                        }
-                            if(flag){
-                                communication <: xneighbour;
-                                communication <: yneighbour;
-                                communication :> flagVal;
-                                neighbours[j+1][i+1] = flagVal;
-                                flag = 0;
-                            }
-                            else {
-                                communication <: 0;
-                                communication <: 0;
-                                communication :> dead;
-                            }
-                    }
-                    liveNeighbours = getLiveNeighbours(neighbours);
-//                    neighbours[0][0]=outimg[xneighbour][yneighbour];
-//                    neighbours[0][1]=outimg[xneighbour][yneighbour];
-//                    neighbours[0][2]=outimg[xneighbour][yneighbour];
-//
-//                    neighbours[1][0]=outimg[xneighbour][yneighbour];
-//                    neighbours[1][1]=outimg[xneighbour][yneighbour];
-//                    neighbours[1][2]=outimg[xneighbour][yneighbour];
-//
-//                    neighbours[2][0]=outimg[xneighbour][yneighbour];
-//                    neighbours[2][1]=outimg[xneighbour][yneighbour];
-//                    neighbours[2][2]=outimg[xneighbour][yneighbour];
-                }
-            }
-
-//            liveNeighbours = getLiveNeighbours(img, x,y);
-            printf("$LiveNeighbours = %d\n",liveNeighbours);
-
-
-
-
-
-
+            liveNeighbours = getLiveNeighbours(img,top,bottom, x,y);
+//            printf("$LiveNeighbours = %d\n",liveNeighbours);
             if(img[x][y] == 255){
               if(liveNeighbours < 2) {
                   outimg[x][y] = img[x][y] ^ 0xFF;
@@ -287,7 +165,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
   //Starting up and wait for tilting of the xCore-200 Explorer
   printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
   printf( "Waiting for Board Tilt...\n" );
-//  fromAcc :> int value;
+  fromAcc :> int value;
 
   //Read in and do something with your image values..
   //This just inverts every pixel, but you should
@@ -305,6 +183,12 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
           outimg[x][y] = img[x][y];
       }
   }
+  for(int x = 0; x< IMWD;x++){
+      worker[0] <: img[x][15];
+      worker[0] <: img[x][8];
+      worker[1] <: img[x][7];
+      worker[1] <: img[x][0];
+  }
 
   par{
 //      processWorker(toWorkers[1],1);
@@ -314,27 +198,13 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
               //printf("$ element[%d] [%d]\n", y,x);
           }
       }
-      for(int y =8; y<(IMHT); y++){
-                for (int x = 0; x<IMWD;x++){
-                    worker[1] <: img[x][y];
-                    //printf("$ element[%d] [%d]\n", y,x);
-                }
-            }
-//      for(int y =8; y<IMHT; y++){
-//          for (int x = 0; x<IMWD;x++){
-//              toWorkers[1] <: img[x][y];
-//          }
-//      }
+      for(int y =IMHT/noWorkers; y<IMHT; y++){
+          for (int x = 0; x<IMWD;x++){
+              worker[1] <: img[x][y];
+          }
+      }
   }
 
-//      par(int index = 0; index< noWorkers;index++){
-//          for(int y = index*(IMHT/noWorkers); y< index*(IMHT/noWorkers)+ IMHT/noWorkers;y++){
-//              for(int x =0 ; x< IMWD;x++){
-//                  processWorker(toWorkers[index], index);
-//                  toWorkers[index] <: img[x][y];
-//              }
-//          }
-//      }
 
   //printf("$Out of the Par \n");
   for(int index =0; index<noWorkers;index++){
@@ -434,7 +304,7 @@ void orientation( client interface i2c_master_if i2c, chanend toDist) {
     if (!tilted) {
       if (x>30) {
         tilted = 1 - tilted;
-//        toDist <: 1;
+        toDist <: 1;
       }
     }
   }
@@ -453,11 +323,10 @@ char infname[] = "test.pgm";     //put your input image path here
 char outfname[] = "testout.pgm"; //put your output image path here
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
 chan worker[noWorkers];
-chan communication;
 
 par {
-    processWorker(worker[0],0, communication);
-    processWorker(worker[1],1, communication);
+    processWorker(worker[0],0);
+    processWorker(worker[1],1);
     i2c_master(i2c, 1, p_scl, p_sda, 10);   //server thread providing orientation data
     orientation(i2c[0],c_control);        //client thread reading orientation data
     DataInStream(infname, c_inIO);          //thread to read in a PGM image
