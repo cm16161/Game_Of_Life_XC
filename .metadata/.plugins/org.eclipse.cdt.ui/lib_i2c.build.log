@@ -1,6 +1,6 @@
-15:46:50 **** Incremental Build of configuration Default for project lib_i2c ****
+23:13:04 **** Build of configuration Default for project lib_i2c ****
 xmake -f .makefile all 
 ** Module only - only builds as part of application **
 
-15:46:50 Build Finished (took 175ms)
+23:13:05 Build Finished (took 665ms)
 

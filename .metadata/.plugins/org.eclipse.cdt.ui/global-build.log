@@ -1233,3 +1233,168 @@ Checking build modules
 Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
 xmake[1]: `bin//game_of_life.xe' is up to date.
 Build Complete
+23:04:49 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing main.xc
+Propagating analysis
+Creating dependencies for main.xc
+Compiling main.xc
+Compiling i2c_master.xc
+Creating game_of_life.xe
+Build Complete
+23:05:29 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing main.xc
+Creating dependencies for main.xc
+Compiling main.xc
+Creating game_of_life.xe
+Build Complete
+23:05:38 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+xmake[1]: `bin//game_of_life.xe' is up to date.
+Build Complete
+23:07:33 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+23:07:41 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+23:07:45 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+23:07:57 **** Incremental Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+23:08:04 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+xmake[1]: `bin//game_of_life.xe' is up to date.
+Build Complete
+23:10:07 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing main.xc
+Creating dependencies for main.xc
+Compiling main.xc
+Creating game_of_life.xe
+Build Complete
+23:11:06 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing main.xc
+Propagating analysis
+Creating dependencies for main.xc
+Compiling main.xc
+Compiling i2c_master.xc
+Creating game_of_life.xe
+Build Complete
+23:12:20 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing main.xc
+Propagating analysis
+Creating dependencies for main.xc
+Compiling main.xc
+Compiling i2c_master.xc
+Creating game_of_life.xe
+Build Complete
+23:12:43 **** Clean-only build of configuration Default for project Game-of-Life ****
+xmake clean 
+Cleaning /home/chetan/Documents/XMOS/COMS20001vIII/game_of_life
+rm -rf './bin/'
+rm -rf '.build'
+23:12:45 **** Clean-only build of configuration Default for project game_of_life ****
+xmake clean 
+/home/chetan/XMOS/xTIMEcomposer/Community_14.3.0/build/xcommon/module_xcommon/build/../build/Makefile.common1:646: *** Multiple copies of lib_i2c found: /home/chetan/Documents/XMOS/COMS20001/lib_i2c /home/chetan/Documents/XMOS/COMS20001vII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIV/lib_i2c//home/chetan/Documents/XMOS/COMS20001/lib_i2c /home/chetan/Documents/XMOS/COMS20001vII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c /home/chetan/Documents/XMOS/COMS20001vIV/lib_i2c.  Stop.
+xmake: *** [clean_common] Error 2
+23:12:46 **** Clean-only build of configuration Default for project lib_i2c ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+23:12:46 **** Clean-only build of configuration Default for project lib_logging ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+23:12:47 **** Clean-only build of configuration Default for project lib_xassert ****
+xmake -f .makefile clean 
+** Module only - only builds as part of application **
+23:12:47 **** Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing pgmIO.c
+Analyzing debug_printf.c
+Analyzing main.xc
+Analyzing i2c_master_async.xc
+/home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c/src/i2c_master_async.xc:126:26: warning: argument 1 of `i2c_master_async_aux' slices interface preventing analysis of its parallel usage
+    i2c_master_async_aux(i, n, i2c_dist[0], max_transaction_size);
+                         ^
+Analyzing i2c_master_ext.xc
+Analyzing i2c_master_single_port.xc
+Analyzing i2c_master.xc
+Analyzing i2c_slave.xc
+Analyzing xassert.xc
+Propagating analysis
+Creating dependencies for xassert.xc
+Creating dependencies for i2c_slave.xc
+Creating dependencies for i2c_master.xc
+Creating dependencies for i2c_master_single_port.xc
+Creating dependencies for i2c_master_ext.xc
+Creating dependencies for i2c_master_async.xc
+Creating dependencies for main.xc
+Creating dependencies for debug_printf.c
+Creating dependencies for pgmIO.c
+Compiling pgmIO.c
+Compiling debug_printf.c
+Compiling main.xc
+Compiling i2c_master_async.xc
+/home/chetan/Documents/XMOS/COMS20001vIII/lib_i2c/src/i2c_master_async.xc:126:26: warning: argument 1 of `i2c_master_async_aux' slices interface preventing analysis of its parallel usage
+    i2c_master_async_aux(i, n, i2c_dist[0], max_transaction_size);
+                         ^
+Compiling i2c_master_ext.xc
+Compiling i2c_master_single_port.xc
+Compiling i2c_master.xc
+Compiling i2c_slave.xc
+Compiling xassert.xc
+Creating game_of_life.xe
+Build Complete
+23:13:03 **** Build of configuration Default for project game_of_life ****
+xmake all 
+xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
+xmake: *** [check_modules_msg] Error 2
+23:13:04 **** Build of configuration Default for project lib_i2c ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+23:13:05 **** Build of configuration Default for project lib_logging ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+23:13:06 **** Build of configuration Default for project lib_xassert ****
+xmake -f .makefile all 
+** Module only - only builds as part of application **
+23:13:09 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+xmake[1]: `bin//game_of_life.xe' is up to date.
+Build Complete
+23:14:10 **** Incremental Build of configuration Default for project Game-of-Life ****
+xmake all 
+Checking build modules
+Using build modules: lib_i2c(3.0.0) lib_logging(2.0.0) lib_xassert(2.0.0)
+Analyzing main.xc
+Creating dependencies for main.xc
+Compiling main.xc
+Creating game_of_life.xe
+Build Complete

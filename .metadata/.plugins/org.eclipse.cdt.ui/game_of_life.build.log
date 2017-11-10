@@ -1,7 +1,7 @@
-17:07:33 **** Incremental Build of configuration Default for project game_of_life ****
+23:13:03 **** Build of configuration Default for project game_of_life ****
 xmake all 
 xmake[1]: *** /home/chetan/Documents/XMOS/COMS20001/lib_i2c: Is a directory.  Stop.
 xmake: *** [check_modules_msg] Error 2
 
-17:07:34 Build Finished (took 262ms)
+23:13:04 Build Finished (took 812ms)
 

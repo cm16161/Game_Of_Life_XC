@@ -1,6 +1,6 @@
-15:46:50 **** Incremental Build of configuration Default for project lib_logging ****
+23:13:05 **** Build of configuration Default for project lib_logging ****
 xmake -f .makefile all 
 ** Module only - only builds as part of application **
 
-15:46:50 Build Finished (took 207ms)
+23:13:06 Build Finished (took 642ms)
 
