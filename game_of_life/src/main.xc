@@ -7,9 +7,9 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  IMHT 16                  //image height
-#define  IMWD 16                  //image width
-#define  noWorkers 2
+#define  IMHT 64                  //image height
+#define  IMWD 64                  //image width
+#define  noWorkers 4
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -114,7 +114,7 @@ void processWorker(chanend toDist, int index){
     for(int y= 0; y<IMHT/noWorkers; y++){
         for(int x=0;x<IMHT;x++){
             outimg[x][y]=img[x][y];
-//            printf(" [%d]",outimg[x][y]);
+//            printf("[%d]",outimg[x][y]);
         }
 //        printf("\n");
     }
@@ -165,7 +165,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
   //Starting up and wait for tilting of the xCore-200 Explorer
   printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
   printf( "Waiting for Board Tilt...\n" );
-  fromAcc :> int value;
+//  fromAcc :> int value;
 
   //Read in and do something with your image values..
   //This just inverts every pixel, but you should
@@ -183,24 +183,41 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
           outimg[x][y] = img[x][y];
       }
   }
-  for(int x = 0; x< IMWD;x++){
-      worker[0] <: img[x][15];
-      worker[0] <: img[x][8];
-      worker[1] <: img[x][7];
-      worker[1] <: img[x][0];
+  for(int index = 0; index < noWorkers; index ++){
+      for(int x = 0; x< IMWD;x++){
+          int top, bottom;
+          top = ((index*(IMHT/noWorkers) -1));
+          bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
+          if (top == -1) top = IMHT-1;
+          if (bottom == IMHT) bottom = 0;
+
+          worker[index] <: img[x][top];
+          worker[index] <: img[x][bottom];
+//          worker[0] <: img[x][15];
+//          worker[0] <: img[x][8];
+//          worker[1] <: img[x][7];
+//          worker[1] <: img[x][0];
+      }
   }
 
   par{
-//      processWorker(toWorkers[1],1);
-      for(int y =0; y<(IMHT/noWorkers); y++){
-          for (int x = 0; x<IMWD;x++){
-              worker[0] <: img[x][y];
-              //printf("$ element[%d] [%d]\n", y,x);
-          }
-      }
-      for(int y =IMHT/noWorkers; y<IMHT; y++){
-          for (int x = 0; x<IMWD;x++){
-              worker[1] <: img[x][y];
+//      for(int y =0; y<(IMHT/noWorkers); y++){
+//          for (int x = 0; x<IMWD;x++){
+//              worker[0] <: img[x][y];
+//              //printf("$ element[%d] [%d]\n", y,x);
+//          }
+//      }
+//      for(int y =IMHT/noWorkers; y<IMHT; y++){
+//          for (int x = 0; x<IMWD;x++){
+//              worker[1] <: img[x][y];
+//          }
+//      }
+
+      for(int index =0; index<noWorkers;index++){
+          for(int y = (index*IMHT/noWorkers); y< ((index*IMHT/noWorkers) + IMHT/noWorkers); y++){
+              for(int x = 0; x <IMWD; x++){
+                  worker[index] <: img[x][y];
+              }
           }
       }
   }
@@ -304,7 +321,7 @@ void orientation( client interface i2c_master_if i2c, chanend toDist) {
     if (!tilted) {
       if (x>30) {
         tilted = 1 - tilted;
-        toDist <: 1;
+//        toDist <: 1;
       }
     }
   }
@@ -319,14 +336,16 @@ int main(void) {
 
 i2c_master_if i2c[1];               //interface to orientation
 
-char infname[] = "test.pgm";     //put your input image path here
-char outfname[] = "testout.pgm"; //put your output image path here
+char infname[] = "64x64.pgm";     //put your input image path here
+char outfname[] = "64_testout.pgm"; //put your output image path here
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
 chan worker[noWorkers];
 
 par {
     processWorker(worker[0],0);
     processWorker(worker[1],1);
+    processWorker(worker[2],2);
+    processWorker(worker[3],3);
     i2c_master(i2c, 1, p_scl, p_sda, 10);   //server thread providing orientation data
     orientation(i2c[0],c_control);        //client thread reading orientation data
     DataInStream(infname, c_inIO);          //thread to read in a PGM image
