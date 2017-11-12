@@ -200,7 +200,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
       }
   }
 
-  par{
+//  par{
 //      for(int y =0; y<(IMHT/noWorkers); y++){
 //          for (int x = 0; x<IMWD;x++){
 //              worker[0] <: img[x][y];
@@ -220,7 +220,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
               }
           }
       }
-  }
+//  }
 
 
   //printf("$Out of the Par \n");
