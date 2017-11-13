@@ -153,7 +153,6 @@ void processWorker(chanend toDist){
     initialiseOutput(outimg, img);
     transformPixel(img,top,bottom,outimg);
     sendOutput(toDist, outimg);
-
 }
 
 void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
@@ -164,6 +163,7 @@ void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
               bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
               if (top == -1) top = IMHT-1;
               if (bottom == IMHT) bottom = 0;
+
               worker[index] <: img[x][top];
               worker[index] <: img[x][bottom];
           }
@@ -200,6 +200,14 @@ void sendFinal(chanend c_out, uchar img[IMWD][IMHT]){
         }
     }
 
+void initialiseIMG(chanend c_in, uchar img[IMWD][IMHT]){
+    for( int y = 0; y < IMHT; y++ ) {               //go through all lines
+        for( int x = 0; x < IMWD; x++ ) {           //go through each pixel per line
+            c_in :> img[x][y];                      //read the pixel value
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 //
 // Start your implementation by changing this function to implement the game of life
@@ -219,13 +227,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
 
   //Read in and do something with your image values..
   printf( "Processing...\n" );
-  for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-    for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-      c_in :> img[x][y];                    //read the pixel value
-
-    }
-  }
-
+  initialiseIMG(c_in, img);
   sendOverlap(worker, img);
   distributeWork(worker, img);
   recieveFinal(worker,img);
@@ -319,7 +321,7 @@ int main(void) {
 i2c_master_if i2c[1];               //interface to orientation
 
 char infname[] = "64x64.pgm";     //put your input image path here
-char outfname[] = "64_test_out_does_this_work_vVIII.pgm"; //put your output image path here
+char outfname[] = "64_test_out_does_this_work_vIX.pgm"; //put your output image path here
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
 chan worker[noWorkers];
 
