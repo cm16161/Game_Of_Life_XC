@@ -7,8 +7,8 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  IMHT 64                  //image height
-#define  IMWD 64                  //image width
+#define  IMHT 16                  //image height
+#define  IMWD 16                  //image width
 #define  noWorkers 4
 
 typedef unsigned char uchar;      //using uchar as shorthand
@@ -94,9 +94,23 @@ int getLiveNeighbours(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD],uchar bot
 }
 
 
-void processWorker(chanend toDist, int index){
-//    int base = index*(IMHT/noWorkers);
-//    int interval = base + (IMHT/noWorkers);
+void sendOutput(chanend toDist, uchar outimg[IMWD][IMHT/noWorkers]){
+    for (int y = 0; y<IMHT/noWorkers;y++){
+            for(int x=0;x<IMWD;x++){
+                toDist <: outimg[x][y];
+            }
+        }
+}
+
+void recieveWork(chanend toDist, uchar img[IMWD][IMHT/noWorkers]){
+    for(int y= 0;y< IMHT/noWorkers;y++){
+            for(int x=0;x<IMWD;x++){
+                toDist :> img[x][y];
+            }
+        }
+}
+
+void processWorker(chanend toDist){
     uchar img[IMWD][IMHT/noWorkers];
     uchar outimg[IMWD][IMHT/noWorkers];
     uchar top[IMWD]; uchar bottom[IMWD];
@@ -106,17 +120,17 @@ void processWorker(chanend toDist, int index){
         toDist :> bottom[x];
 //        printf("$ top[%d], bottom[%d]\n", top[x],bottom[x]);
     }
-    for(int y= 0;y< IMHT/noWorkers;y++){
-        for(int x=0;x<IMWD;x++){
-            toDist :> img[x][y];
-        }
-    }
+    recieveWork(toDist, img);
+//    for(int y= 0;y< IMHT/noWorkers;y++){
+//        for(int x=0;x<IMWD;x++){
+//            toDist :> img[x][y];
+//        }
+//    }
+
     for(int y= 0; y<IMHT/noWorkers; y++){
         for(int x=0;x<IMHT;x++){
             outimg[x][y]=img[x][y];
-//            printf("[%d]",outimg[x][y]);
         }
-//        printf("\n");
     }
 
     for(int y = 0; y<IMHT/noWorkers;y++){
@@ -137,13 +151,12 @@ void processWorker(chanend toDist, int index){
 
         }
     }
-
-    for (int y = 0; y<IMHT/noWorkers;y++){
-        for(int x=0;x<IMWD;x++){
-            toDist <: outimg[x][y];
-            //printf("$Sent some data \n");
-        }
-    }
+    sendOutput(toDist, outimg);
+//    for (int y = 0; y<IMHT/noWorkers;y++){
+//        for(int x=0;x<IMWD;x++){
+//            toDist <: outimg[x][y];
+//        }
+//    }
 
 }
 
@@ -158,13 +171,39 @@ void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
 
               worker[index] <: img[x][top];
               worker[index] <: img[x][bottom];
-    //          worker[0] <: img[x][15];
-    //          worker[0] <: img[x][8];
-    //          worker[1] <: img[x][7];
-    //          worker[1] <: img[x][0];
           }
       }
 }
+
+void distributeWork(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
+    for(int index =0; index<noWorkers;index++){
+          for(int y = (index*IMHT/noWorkers); y< ((index*IMHT/noWorkers) + IMHT/noWorkers); y++){
+              for(int x = 0; x <IMWD; x++){
+                  worker[index] <: img[x][y];
+              }
+          }
+      }
+}
+
+void recieveFinal(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
+    for(int index =0; index<noWorkers;index++){
+        int base = index*(IMHT/noWorkers);
+        int interval = base + (IMHT/noWorkers);
+        for(int y = base; y< interval; y++){
+            for(int x = 0; x < IMWD; x++){
+                worker[index] :> img[x][y];
+            }
+        }
+    }
+}
+
+void sendFinal(chanend c_out, uchar img[IMWD][IMHT]){
+        for(int y = 0; y< IMHT; y++){
+            for(int x = 0; x < IMWD; x++){
+                c_out <: img[x][y];
+            }
+        }
+    }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -176,10 +215,7 @@ void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
 void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[noWorkers])
 {
 
-  //chan toWorkers[noWorkers];
   uchar img[IMWD][IMHT];
-  uchar outimg[IMWD][IMHT];
-//  int liveNeighbours;
 
   //Starting up and wait for tilting of the xCore-200 Explorer
   printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
@@ -187,8 +223,6 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
 //  fromAcc :> int value;
 
   //Read in and do something with your image values..
-  //This just inverts every pixel, but you should
-  //change the image according to the "Game of Life"
   printf( "Processing...\n" );
   for( int y = 0; y < IMHT; y++ ) {   //go through all lines
     for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
@@ -197,76 +231,26 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
     }
   }
 
-//  for(int y= 0; y< IMHT; y++){
-//      for(int x=0; x< IMWD; x++){
-//          outimg[x][y] = img[x][y];
-//      }
-//  }
-
   sendOverlap(worker, img);
-//  for(int index = 0; index < noWorkers; index ++){
-//      for(int x = 0; x< IMWD;x++){
-//          int top, bottom;
-//          top = ((index*(IMHT/noWorkers) -1));
-//          bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
-//          if (top == -1) top = IMHT-1;
-//          if (bottom == IMHT) bottom = 0;
-//
-//          worker[index] <: img[x][top];
-//          worker[index] <: img[x][bottom];
-//          worker[0] <: img[x][15];
-//          worker[0] <: img[x][8];
-//          worker[1] <: img[x][7];
-//          worker[1] <: img[x][0];
+  distributeWork(worker, img);
+//  for(int index =0; index<noWorkers;index++){
+//      for(int y = (index*IMHT/noWorkers); y< ((index*IMHT/noWorkers) + IMHT/noWorkers); y++){
+//          for(int x = 0; x <IMWD; x++){
+//              worker[index] <: img[x][y];
+//          }
 //      }
 //  }
 
-//  par{
-//      for(int y =0; y<(IMHT/noWorkers); y++){
-//          for (int x = 0; x<IMWD;x++){
-//              worker[0] <: img[x][y];
-//              //printf("$ element[%d] [%d]\n", y,x);
+  recieveFinal(worker,img);
+  sendFinal(c_out, img);
+//  for(int index =0; index<noWorkers;index++){
+//      int base = index*(IMHT/noWorkers);
+//      int interval = base + (IMHT/noWorkers);
+//      for(int y = base; y< interval; y++){
+//          for(int x = 0; x < IMWD; x++){
+//              worker[index] :> img[x][y];
+//              c_out <: img[x][y];
 //          }
-//      }
-//      for(int y =IMHT/noWorkers; y<IMHT; y++){
-//          for (int x = 0; x<IMWD;x++){
-//              worker[1] <: img[x][y];
-//          }
-//      }
-
-      for(int index =0; index<noWorkers;index++){
-          for(int y = (index*IMHT/noWorkers); y< ((index*IMHT/noWorkers) + IMHT/noWorkers); y++){
-              for(int x = 0; x <IMWD; x++){
-                  worker[index] <: img[x][y];
-              }
-          }
-      }
-//  }
-
-
-  //printf("$Out of the Par \n");
-  for(int index =0; index<noWorkers;index++){
-      int base = index*(IMHT/noWorkers);
-      int interval = base + (IMHT/noWorkers);
-      for(int y = base; y< interval; y++){
-          for(int x = 0; x < IMWD; x++){
-              //printf("$dist trying to recieve\n");
-              worker[index] :> outimg[x][y];
-              c_out <: outimg[x][y];
-          }
-      }
-  }
-
-//  for(int y= 0;y < IMHT; y++){
-//      for(int x=0;x<IMWD; x++){
-//          liveNeighbours = getLiveNeighbours(img, x,y);
-//          if(img[x][y] == 255){
-//              if(liveNeighbours < 2) {outimg[x][y] = img[x][y] ^ 0xFF;
-//              }
-//              else if(liveNeighbours > 3) {outimg[x][y] = img[x][y] ^ 0xFF;
-//              }
-//          }
-//          if(img[x][y] == 0) {if(liveNeighbours == 3) outimg[x][y] = 255;}
 //      }
 //  }
   printf( "\nOne processing round completed...\n" );
@@ -357,23 +341,19 @@ int main(void) {
 
 i2c_master_if i2c[1];               //interface to orientation
 
-char infname[] = "64x64.pgm";     //put your input image path here
-char outfname[] = "64_test_out_does_this_work.pgm"; //put your output image path here
+char infname[] = "test.pgm";     //put your input image path here
+char outfname[] = "test_out_does_this_work_vVII.pgm"; //put your output image path here
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
 chan worker[noWorkers];
 
 par {
-//    processWorker(worker[0],0);
-//    processWorker(worker[1],1);
-//    processWorker(worker[2],2);
-//    processWorker(worker[3],3);
     i2c_master(i2c, 1, p_scl, p_sda, 10);   //server thread providing orientation data
     orientation(i2c[0],c_control);        //client thread reading orientation data
     DataInStream(infname, c_inIO);          //thread to read in a PGM image
     DataOutStream(outfname, c_outIO);       //thread to write out a PGM image
     distributor(c_inIO, c_outIO, c_control, worker);//thread to coordinate work on image
     par(int index = 0; index<noWorkers; index++){
-        processWorker(worker[index],index);
+        processWorker(worker[index]);
     }
 }
 
