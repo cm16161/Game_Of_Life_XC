@@ -7,8 +7,9 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  IMHT 16                  //image height
-#define  IMWD 16                  //image width
+#define  ImageSize 64
+#define  IMHT ImageSize                  //image height
+#define  IMWD ImageSize                  //image width
 #define  noWorkers 4
 
 typedef unsigned char uchar;      //using uchar as shorthand
@@ -77,10 +78,12 @@ int getLiveNeighbours(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD],uchar bot
                 if(flagup){
                     if(top[xneighbour] == 255) counter++;
                     flagup =0;
+//                    printf("$top[%d] = %d\n", xneighbour,top[xneighbour]);
                 }
                 else if(flagdown){
                     if(bottom[xneighbour] == 255) counter++;
                     flagdown =0;
+//                    printf("$bottom[%d] = %d\n", xneighbour,bottom[xneighbour]);
                 }
                 else{
                     if (img[xneighbour][yneighbour] == 255) counter++;
@@ -100,6 +103,13 @@ void sendOutput(chanend toDist, uchar outimg[IMWD][IMHT/noWorkers]){
         }
 }
 
+void recieveOverlap(chanend toDist, uchar top[IMWD], uchar bottom[IMWD]){
+    for (int x = 0; x <IMWD; x++){
+        toDist :> top[x];
+        toDist :> bottom[x];
+    }
+}
+
 void recieveWork(chanend toDist, uchar img[IMWD][IMHT/noWorkers]){
     for(int y= 0;y< IMHT/noWorkers;y++){
             for(int x=0;x<IMWD;x++){
@@ -108,41 +118,84 @@ void recieveWork(chanend toDist, uchar img[IMWD][IMHT/noWorkers]){
         }
 }
 
-void processWorker(chanend toDist){
-    uchar img[IMWD][IMHT/noWorkers];
-    uchar outimg[IMWD][IMHT/noWorkers];
-    uchar top[IMWD]; uchar bottom[IMWD];
-    int liveNeighbours;
-    for (int x = 0; x <IMWD; x++){
-        toDist :> top[x];
-        toDist :> bottom[x];
-    }
-    recieveWork(toDist, img);
-
+void initialiseOutput(uchar outimg[IMWD][IMHT/noWorkers], uchar img[IMWD][IMHT/noWorkers]){
     for(int y= 0; y<IMHT/noWorkers; y++){
         for(int x=0;x<IMHT;x++){
             outimg[x][y]=img[x][y];
         }
     }
+}
 
+void transformPixel(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD], uchar bottom[IMWD], uchar outimg[IMWD][IMHT/noWorkers]){
+    int liveNeighbours;
     for(int y = 0; y<IMHT/noWorkers;y++){
         for(int x =0; x < IMWD; x++){
             liveNeighbours = getLiveNeighbours(img,top,bottom, x,y);
+//          printf("$LiveNeighbours = %d\n",liveNeighbours);
             if(img[x][y] == 255){
-              if(liveNeighbours < 2) {
-                  outimg[x][y] = img[x][y] ^ 0xFF;
-              }
-           else if(liveNeighbours > 3) {
-               outimg[x][y] = img[x][y] ^ 0xFF;
-               }
+                if(liveNeighbours < 2) {
+                    outimg[x][y] = img[x][y] ^ 0xFF;
+                }
+                else if(liveNeighbours > 3) {
+                    outimg[x][y] = img[x][y] ^ 0xFF;
+                }
             }
-          if(img[x][y] == 0) {
-              if(liveNeighbours == 3) outimg[x][y] = 255;
-          }
-
+            if(img[x][y] == 0) {
+                if(liveNeighbours == 3) outimg[x][y] = 255;
+            }
         }
     }
+}
+
+void processWorker(chanend toDist){
+    uchar img[IMWD][IMHT/noWorkers];
+    uchar outimg[IMWD][IMHT/noWorkers];
+    uchar top[IMWD]; uchar bottom[IMWD];
+//    int liveNeighbours;
+    recieveOverlap(toDist, top, bottom);
+//    for (int x = 0; x <IMWD; x++){
+//        toDist :> top[x];
+//        toDist :> bottom[x];
+//    }
+    recieveWork(toDist, img);
+//    for(int y= 0;y< IMHT/noWorkers;y++){
+//        for(int x=0;x<IMWD;x++){
+//            toDist :> img[x][y];
+//        }
+//    }
+    initialiseOutput(outimg, img);
+//    for(int y= 0; y<IMHT/noWorkers; y++){
+//        for(int x=0;x<IMHT;x++){
+//            outimg[x][y]=img[x][y];
+//        }
+//    }
+
+    transformPixel(img,top,bottom,outimg);
+//    for(int y = 0; y<IMHT/noWorkers;y++){
+//        for(int x =0; x < IMWD; x++){
+//            liveNeighbours = getLiveNeighbours(img,top,bottom, x,y);
+////            printf("$LiveNeighbours = %d\n",liveNeighbours);
+//            if(img[x][y] == 255){
+//              if(liveNeighbours < 2) {
+//                  outimg[x][y] = img[x][y] ^ 0xFF;
+//              }
+//           else if(liveNeighbours > 3) {
+//               outimg[x][y] = img[x][y] ^ 0xFF;
+//               }
+//            }
+//          if(img[x][y] == 0) {
+//              if(liveNeighbours == 3) outimg[x][y] = 255;
+//          }
+//
+//        }
+//    }
     sendOutput(toDist, outimg);
+//    for (int y = 0; y<IMHT/noWorkers;y++){
+//        for(int x=0;x<IMWD;x++){
+//            toDist <: outimg[x][y];
+//        }
+//    }
+
 }
 
 void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
@@ -218,8 +271,26 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
 
   sendOverlap(worker, img);
   distributeWork(worker, img);
+//  for(int index =0; index<noWorkers;index++){
+//      for(int y = (index*IMHT/noWorkers); y< ((index*IMHT/noWorkers) + IMHT/noWorkers); y++){
+//          for(int x = 0; x <IMWD; x++){
+//              worker[index] <: img[x][y];
+//          }
+//      }
+//  }
+
   recieveFinal(worker,img);
   sendFinal(c_out, img);
+//  for(int index =0; index<noWorkers;index++){
+//      int base = index*(IMHT/noWorkers);
+//      int interval = base + (IMHT/noWorkers);
+//      for(int y = base; y< interval; y++){
+//          for(int x = 0; x < IMWD; x++){
+//              worker[index] :> img[x][y];
+//              c_out <: img[x][y];
+//          }
+//      }
+//  }
   printf( "\nOne processing round completed...\n" );
 }
 
@@ -308,8 +379,8 @@ int main(void) {
 
 i2c_master_if i2c[1];               //interface to orientation
 
-char infname[] = "test.pgm";     //put your input image path here
-char outfname[] = "test_out_does_this_work_vVII.pgm"; //put your output image path here
+char infname[] = "64x64.pgm";     //put your input image path here
+char outfname[] = "64_test_out_does_this_work_vVIII.pgm"; //put your output image path here
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
 chan worker[noWorkers];
 
