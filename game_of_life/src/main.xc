@@ -147,6 +147,25 @@ void processWorker(chanend toDist, int index){
 
 }
 
+void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
+    for(int index = 0; index < noWorkers; index ++){
+          for(int x = 0; x< IMWD;x++){
+              int top, bottom;
+              top = ((index*(IMHT/noWorkers) -1));
+              bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
+              if (top == -1) top = IMHT-1;
+              if (bottom == IMHT) bottom = 0;
+
+              worker[index] <: img[x][top];
+              worker[index] <: img[x][bottom];
+    //          worker[0] <: img[x][15];
+    //          worker[0] <: img[x][8];
+    //          worker[1] <: img[x][7];
+    //          worker[1] <: img[x][0];
+          }
+      }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 //
 // Start your implementation by changing this function to implement the game of life
@@ -178,27 +197,29 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
     }
   }
 
-  for(int y= 0; y< IMHT; y++){
-      for(int x=0; x< IMWD; x++){
-          outimg[x][y] = img[x][y];
-      }
-  }
-  for(int index = 0; index < noWorkers; index ++){
-      for(int x = 0; x< IMWD;x++){
-          int top, bottom;
-          top = ((index*(IMHT/noWorkers) -1));
-          bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
-          if (top == -1) top = IMHT-1;
-          if (bottom == IMHT) bottom = 0;
+//  for(int y= 0; y< IMHT; y++){
+//      for(int x=0; x< IMWD; x++){
+//          outimg[x][y] = img[x][y];
+//      }
+//  }
 
-          worker[index] <: img[x][top];
-          worker[index] <: img[x][bottom];
+  sendOverlap(worker, img);
+//  for(int index = 0; index < noWorkers; index ++){
+//      for(int x = 0; x< IMWD;x++){
+//          int top, bottom;
+//          top = ((index*(IMHT/noWorkers) -1));
+//          bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
+//          if (top == -1) top = IMHT-1;
+//          if (bottom == IMHT) bottom = 0;
+//
+//          worker[index] <: img[x][top];
+//          worker[index] <: img[x][bottom];
 //          worker[0] <: img[x][15];
 //          worker[0] <: img[x][8];
 //          worker[1] <: img[x][7];
 //          worker[1] <: img[x][0];
-      }
-  }
+//      }
+//  }
 
 //  par{
 //      for(int y =0; y<(IMHT/noWorkers); y++){
@@ -337,21 +358,25 @@ int main(void) {
 i2c_master_if i2c[1];               //interface to orientation
 
 char infname[] = "64x64.pgm";     //put your input image path here
-char outfname[] = "64_testout.pgm"; //put your output image path here
+char outfname[] = "64_test_out_does_this_work.pgm"; //put your output image path here
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
 chan worker[noWorkers];
 
 par {
-    processWorker(worker[0],0);
-    processWorker(worker[1],1);
-    processWorker(worker[2],2);
-    processWorker(worker[3],3);
+//    processWorker(worker[0],0);
+//    processWorker(worker[1],1);
+//    processWorker(worker[2],2);
+//    processWorker(worker[3],3);
     i2c_master(i2c, 1, p_scl, p_sda, 10);   //server thread providing orientation data
     orientation(i2c[0],c_control);        //client thread reading orientation data
     DataInStream(infname, c_inIO);          //thread to read in a PGM image
     DataOutStream(outfname, c_outIO);       //thread to write out a PGM image
     distributor(c_inIO, c_outIO, c_control, worker);//thread to coordinate work on image
-  }
+    par(int index = 0; index<noWorkers; index++){
+        processWorker(worker[index],index);
+    }
+}
+
 
   return 0;
 }
