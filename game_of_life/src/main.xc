@@ -77,12 +77,10 @@ int getLiveNeighbours(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD],uchar bot
                 if(flagup){
                     if(top[xneighbour] == 255) counter++;
                     flagup =0;
-//                    printf("$top[%d] = %d\n", xneighbour,top[xneighbour]);
                 }
                 else if(flagdown){
                     if(bottom[xneighbour] == 255) counter++;
                     flagdown =0;
-//                    printf("$bottom[%d] = %d\n", xneighbour,bottom[xneighbour]);
                 }
                 else{
                     if (img[xneighbour][yneighbour] == 255) counter++;
@@ -118,14 +116,8 @@ void processWorker(chanend toDist){
     for (int x = 0; x <IMWD; x++){
         toDist :> top[x];
         toDist :> bottom[x];
-//        printf("$ top[%d], bottom[%d]\n", top[x],bottom[x]);
     }
     recieveWork(toDist, img);
-//    for(int y= 0;y< IMHT/noWorkers;y++){
-//        for(int x=0;x<IMWD;x++){
-//            toDist :> img[x][y];
-//        }
-//    }
 
     for(int y= 0; y<IMHT/noWorkers; y++){
         for(int x=0;x<IMHT;x++){
@@ -136,7 +128,6 @@ void processWorker(chanend toDist){
     for(int y = 0; y<IMHT/noWorkers;y++){
         for(int x =0; x < IMWD; x++){
             liveNeighbours = getLiveNeighbours(img,top,bottom, x,y);
-//            printf("$LiveNeighbours = %d\n",liveNeighbours);
             if(img[x][y] == 255){
               if(liveNeighbours < 2) {
                   outimg[x][y] = img[x][y] ^ 0xFF;
@@ -152,12 +143,6 @@ void processWorker(chanend toDist){
         }
     }
     sendOutput(toDist, outimg);
-//    for (int y = 0; y<IMHT/noWorkers;y++){
-//        for(int x=0;x<IMWD;x++){
-//            toDist <: outimg[x][y];
-//        }
-//    }
-
 }
 
 void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
@@ -233,26 +218,8 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
 
   sendOverlap(worker, img);
   distributeWork(worker, img);
-//  for(int index =0; index<noWorkers;index++){
-//      for(int y = (index*IMHT/noWorkers); y< ((index*IMHT/noWorkers) + IMHT/noWorkers); y++){
-//          for(int x = 0; x <IMWD; x++){
-//              worker[index] <: img[x][y];
-//          }
-//      }
-//  }
-
   recieveFinal(worker,img);
   sendFinal(c_out, img);
-//  for(int index =0; index<noWorkers;index++){
-//      int base = index*(IMHT/noWorkers);
-//      int interval = base + (IMHT/noWorkers);
-//      for(int y = base; y< interval; y++){
-//          for(int x = 0; x < IMWD; x++){
-//              worker[index] :> img[x][y];
-//              c_out <: img[x][y];
-//          }
-//      }
-//  }
   printf( "\nOne processing round completed...\n" );
 }
 
