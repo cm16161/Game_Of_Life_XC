@@ -41,9 +41,6 @@ int showLEDs(out port p, chanend fromButtons, chanend workerPause[noWorkers]) {
                //3rd bit...green LED
                //4th bit...red LED
   while (1) {
-    //fromButtons :> pattern;   //receive new pattern from visualiser
-    //p <: pattern;                //send pattern to LED port
-    //printf("KKKKKKKKKKKKKKKKKKKKKKKKKKEEEEEEEEEEEEEEEEEEEEEEEEPPPPPPPPPPPPPPPPPPPPPPPSSSSSSSSSS\n");
     select {
         case fromButtons :> pattern:
             p <: pattern;
@@ -57,11 +54,8 @@ int showLEDs(out port p, chanend fromButtons, chanend workerPause[noWorkers]) {
 }
 
 void buttonListener(in port b, chanend toDist, chanend toLEDs) {
-  //sw1 = 14
-  //sw2 = 13
   int r;
   int data;
-  //int firstTurn = 1;
   int writtenback = 1;
 
   while (1) {
@@ -78,15 +72,10 @@ void buttonListener(in port b, chanend toDist, chanend toLEDs) {
           writtenback = 0;
       }
       if (r == 13 && writtenback == 0) {
-          //printf("BRRRRRRRRRRRAAAAAAAAAAAAAAAAAAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPP\n");
           toDist :> data;
-          //printf(" %d   BRRRRRRRRRRRAAAAAAAAAAAAAAAAAAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPP\n", data);
           toLEDs <: data;
-          //printf("  2   BRRRRRRRRRRRAAAAAAAAAAAAAAAAAAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPP\n");
           toDist :> data;
-          //printf("   3   BRRRRRRRRRRRAAAAAAAAAAAAAAAAAAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPP\n");
           toLEDs <: data;
-          //printf("   4     BRRRRRRRRRRRAAAAAAAAAAAAAAAAAAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPP\n");
           writtenback = 1;
       }
   }
@@ -118,9 +107,7 @@ void DataInStream(char infname[], chanend c_out)
     _readinline( line, IMWD );
     for( int x = 0; x < IMWD; x++ ) {
       c_out <: line[ x ];
-//      printf( "-%4.1d ", line[ x ] ); //show image values
     }
-//    printf( "\n" );
   }
 
   //Close PGM image file
@@ -202,17 +189,27 @@ void initialiseOutput(uchar outimg[IMWD][IMHT/noWorkers], uchar img[IMWD][IMHT/n
     }
 }
 
+void pauseWorkerFunction(chanend pauseWorker, int pause, chanend toLEDs, int alternator){
+  pauseWorker :> pause;
+  while (pause == 1) {
+      pauseWorker :> pause;
+      toLEDs <: 8 | alternator;
+  }
+  toLEDs <: 0 | alternator;
+}
+
 void transformPixel(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD], uchar bottom[IMWD], uchar outimg[IMWD][IMHT/noWorkers], chanend pauseWorker, int pause, chanend toLEDs, int alternator){
     int liveNeighbours;
     for(int y = 0; y<IMHT/noWorkers;y++){
         for(int x =0; x < IMWD; x++){
 
-          pauseWorker :> pause;
-          while (pause == 1) {
-              pauseWorker :> pause;
-              toLEDs <: 8 | alternator;
-          }
-          toLEDs <: 0 | alternator;
+          pauseWorkerFunction(pauseWorker, pause, toLEDs, alternator);
+          /*pauseWorker :> pause;*/
+          /*while (pause == 1) {*/
+              /*pauseWorker :> pause;*/
+              /*toLEDs <: 8 | alternator;*/
+          /*}*/
+          /*toLEDs <: 0 | alternator;*/
 
             liveNeighbours = getLiveNeighbours(img,top,bottom, x,y);
             if(img[x][y] == 255){
@@ -300,6 +297,21 @@ void initialiseIMG(chanend c_in, uchar img[IMWD][IMHT]){
     }
 }
 
+void getButton(chanend fromButtons, int alternator){
+  int buttonPress = 0;
+  fromButtons :> buttonPress;
+  fromButtons <: 4 | alternator;
+}
+
+void sendAlternator(chanend fromButtons, int alternator){
+  fromButtons <: 0 | alternator;
+  if (alternator == 1) alternator = 0;
+  else alternator = 1;
+
+  for (int a = 0; a < noWorkers; a++) {
+      worker[a] <: alternator;
+  }
+}
 /////////////////////////////////////////////////////////////////////////////////////////
 //
 // Start your implementation by changing this function to implement the game of life
@@ -321,9 +333,10 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
 
 // printf( "Waiting for Board Tilt...\n" );
 //  fromAcc :> int value;
-  int buttonPress = 0;
-  fromButtons :> buttonPress;
-  fromButtons <: 4 | alternator;
+  getButton(fromButtons, alternator);
+//  int buttonPress = 0;
+//  fromButtons :> buttonPress;
+//  fromButtons <: 4 | alternator;
 
 
 
@@ -331,13 +344,14 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
   printf( "Processing...\n" );
   initialiseIMG(c_in, img);
 
-  fromButtons <: 0 | alternator;
-  if (alternator == 1) alternator = 0;
-  else alternator = 1;
+  sendAlternator(fromButtons, alternator);
+  //fromButtons <: 0 | alternator;
+  //if (alternator == 1) alternator = 0;
+  //else alternator = 1;
 
-  for (int a = 0; a < noWorkers; a++) {
-      worker[a] <: alternator;
-  }
+  //for (int a = 0; a < noWorkers; a++) {
+  //    worker[a] <: alternator;
+  //}
 
 
   sendOverlap(worker, img);
