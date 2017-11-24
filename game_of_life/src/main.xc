@@ -7,19 +7,28 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  ImageSize 16
+#define  ImageSize 128
 #define  IMHT ImageSize                  //image height
 #define  IMWD ImageSize                  //image width
 #define  noWorkers 4
-#define steps 5
+
+#define  steps 1
+
+#if(ImageSize % 32 == 0)
+    #define IntSize 32
+#else
+    #define IntSize 16
+#endif
+
+#define ubound ((IMHT * IMWD) / IntSize)
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
 on tile[0] : port p_scl = XS1_PORT_1E;         //interface ports to orientation
 on tile[0] : port p_sda = XS1_PORT_1F;
 
-char infname[] = "test---.pgm";     //put your input image path here
-char outfname[] = "testout.pgm"; //put your output image path here
+char infname[20] = "128x128.pgm";     //put your input image path here
+char outfname[20] = "testoutNOOT128.pgm"; //put your output image path here
 
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
@@ -107,7 +116,10 @@ void DataInStream(char infname[], chanend c_out)
     _readinline( line, IMWD );
     for( int x = 0; x < IMWD; x++ ) {
       c_out <: line[ x ];
+//      if (line[x] == 255)printf("1");
+  //    else printf("0");
     }
+//    printf("\n");
   }
 
   //Close PGM image file
@@ -118,73 +130,113 @@ void DataInStream(char infname[], chanend c_out)
       strcpy(infname,"testout.pgm");
       alternator = 1;
   }
-  else {
-      strcpy(infname,"test---.pgm");
-      alternator = 0;
-  }
   c_out :> int data;
 }
   return;
 }
 
-int getLiveNeighbours(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD],uchar bottom[IMWD], int x, int y){
-    int counter = 0;
-    int flagup =0;
-    int flagdown =0;
-    for(int j = -1; j<2; j++){
-        for(int i =-1; i<2; i++){
-            int xneighbour = (x+i) ;
-            int yneighbour = (y+j) ;
-            if(xneighbour == -1) xneighbour = IMWD -1;
-            if(xneighbour == IMWD) xneighbour = 0;
-            if(yneighbour == -1) {yneighbour = IMHT-1; flagup =1;}
-            if(yneighbour == IMHT/noWorkers) {yneighbour = 0; flagdown = 1;}
-            if((i != 0) || (j!=0)){
-                if(flagup){
-                    if(top[xneighbour] == 255) counter++;
-                    flagup =0;
-                }
-                else if(flagdown){
-                    if(bottom[xneighbour] == 255) counter++;
-                    flagdown =0;
-                }
-                else{
-                    if (img[xneighbour][yneighbour] == 255) counter++;
-                }
-            }
+
+void pack(chanend c_in, int world[ubound]){
+  uchar buffer;
+  for( int y = 0; y < IMHT; y++ ) {               //go through all lines
+      for( int x = 0; x < (IMWD/IntSize); x++ ) {           //go through each pixel per line
+          for (int k = 0; k < IntSize; k++) {
+          c_in :> buffer;                      //read the pixel value
+          if (buffer == 255) {
+              world[(y*(IMWD/IntSize)) + x] = (world[(y*(IMWD/IntSize)) + x] | 1 << (IntSize -1 -k));
+          }
         }
+      }
+  }
+}
+
+int isAlive(int unit, int index){
+    if (unit & (1 << (IntSize -1 - (index)))) return 1;
+    else return 0;
+}
+
+int cleanDivide(int x) {
+    int counter = 0;
+    int remainder = x;
+    while (remainder >= IntSize) {
+        counter = counter + 1;
+        remainder = remainder - IntSize;
     }
     return counter;
 }
 
+int getLiveNeighbours(int index, int processArray[3*(IMWD/IntSize)], int top, int bottom , int mid, int x){
+int counter = 0;
+int flagup, flagdown;
+for(int j = -1; j<2; j++){
+    for(int i =-1; i<2; i++){
+        flagup = 0;
+        flagdown = 0;
+        int xneighbour = (x+i) ;
+        int yneighbour;
+        if(xneighbour == -1) xneighbour = IMWD -1;
+        if(xneighbour == IMWD) xneighbour = 0;
 
-void sendOutput(chanend toDist, uchar outimg[IMWD][IMHT/noWorkers]){
-    for (int y = 0; y<IMHT/noWorkers;y++){
-            for(int x=0;x<IMWD;x++){
-                toDist <: outimg[x][y];
+        if(j == -1) {yneighbour = top; flagup =1;}
+        else if(j== 1) {yneighbour = bottom; flagdown = 1;}
+        else if(j == 0) {yneighbour = mid;}
+        if((i != 0) || (j!=0)){
+            int passTop = cleanDivide(xneighbour);
+            if(flagup == 1){
+                if(isAlive(processArray[passTop], xneighbour % IntSize)) counter++;
+                flagup =0;
+            }
+            else if(flagdown == 1){
+                int passBottom = cleanDivide(xneighbour);
+                if(isAlive(processArray[(2*(IMWD/IntSize))+passBottom], xneighbour % IntSize)) counter++;
+                flagdown =0;
+            }
+            else{
+                int passY = cleanDivide(xneighbour);
+                if(isAlive(processArray[((IMWD/IntSize))+passY], xneighbour % IntSize)) counter++;
             }
         }
+    }
+}
+//printf("$%d\n", counter);
+
+return counter;
 }
 
-void recieveOverlap(chanend toDist, uchar top[IMWD], uchar bottom[IMWD]){
-    for (int x = 0; x <IMWD; x++){
-        toDist :> top[x];
-        toDist :> bottom[x];
+void sendOutput(chanend toDist, int outputworld[ubound/noWorkers]){
+    for (int y = 0; y<IMHT/noWorkers;y++){
+        for (int x = 0; x < IMHT/IntSize; x++) {
+            if((y==5) && (x==0)){
+            }
+            toDist <: outputworld[(y*(IMWD/IntSize)) + x];
+        }
     }
 }
 
-void recieveWork(chanend toDist, uchar img[IMWD][IMHT/noWorkers]){
-    for(int y= 0;y< IMHT/noWorkers;y++){
-            for(int x=0;x<IMWD;x++){
-                toDist :> img[x][y];
-            }
-        }
+void recieveOverlap(chanend toDist, int processArray[3*(IMWD/IntSize)]){
+    for (int x = 0; x <(IMWD/IntSize); x++){
+        toDist :> processArray[x];
+        toDist :> processArray[(IMWD/IntSize)+x];
+        toDist :> processArray[2*(IMWD/IntSize)+x];
+    }
 }
 
-void initialiseOutput(uchar outimg[IMWD][IMHT/noWorkers], uchar img[IMWD][IMHT/noWorkers]){
-    for(int y= 0; y<IMHT/noWorkers; y++){
-        for(int x=0;x<IMHT;x++){
-            outimg[x][y]=img[x][y];
+/*void recieveWork(chanend toDist, int processArray[3*(IMWD/IntSize)], int overWriteIndex){
+            for (int x = 0; x < IMWD/IntSize; x++) {
+                toDist :> processArray[(overWriteIndex*(IMWD/IntSize)) + x]; //packed up row...
+            }
+       // }
+}*/
+
+void initialiseOutput(int outputworld[ubound/noWorkers], int processArray[3*(IMHT/IntSize)]){
+    for (int y = 0; y<IMHT/noWorkers;y++){
+         for (int x = 0; x < IMHT/IntSize; x++) {
+              outputworld[(y*(IMWD/IntSize)) + x] = 0;
+         }
+    }
+    for (int y = 0; y < 3; y++) {
+        for (int x = 0; x < (IMHT/IntSize); x++) {
+            processArray[(y*(IMHT/IntSize)) + x] = 0;
         }
     }
 }
@@ -198,102 +250,140 @@ void pauseWorkerFunction(chanend pauseWorker, int pause, chanend toLEDs, int alt
   toLEDs <: 0 | alternator;
 }
 
-void transformPixel(uchar img[IMWD][IMHT/noWorkers], uchar top[IMWD], uchar bottom[IMWD], uchar outimg[IMWD][IMHT/noWorkers], chanend pauseWorker, int pause, chanend toLEDs, int alternator){
-    int liveNeighbours;
-    for(int y = 0; y<IMHT/noWorkers;y++){
-        for(int x =0; x < IMWD; x++){
-
-          pauseWorkerFunction(pauseWorker, pause, toLEDs, alternator);
-          /*pauseWorker :> pause;*/
-          /*while (pause == 1) {*/
-              /*pauseWorker :> pause;*/
-              /*toLEDs <: 8 | alternator;*/
-          /*}*/
-          /*toLEDs <: 0 | alternator;*/
-
-            liveNeighbours = getLiveNeighbours(img,top,bottom, x,y);
-            if(img[x][y] == 255){
-                if(liveNeighbours < 2) {
-                    outimg[x][y] = img[x][y] ^ 0xFF;
-                }
-                else if(liveNeighbours > 3) {
-                    outimg[x][y] = img[x][y] ^ 0xFF;
-                }
-            }
-            if(img[x][y] == 0) {
-                if(liveNeighbours == 3) outimg[x][y] = 255;
-            }
-        }
+void changeBit(int outputworld[ubound/noWorkers], int outputWorldUnit, int x, int change){
+    if (change == 1) {
+        outputworld[outputWorldUnit] = outputworld[outputWorldUnit] | (change << IntSize -1 - x);
+    }
+    else {
+        outputworld[outputWorldUnit] = outputworld[outputWorldUnit] & ~(change << IntSize -1 - x);
     }
 }
 
-void processWorker(chanend toDist, chanend pauseWorker, chanend toLEDs){
+void transformPixel(int index, int processArray[3*(IMWD/IntSize)],int depth, int mid, int top, int bottom, int outputworld[ubound/noWorkers], chanend pauseWorker, int pause, chanend toLEDs, int alternator){
+    int liveNeighbours;
+    int counter = 0;
+        for(int x =0; x < IMWD; x++){
+          counter = counter + 1;
+          pauseWorkerFunction(pauseWorker, pause, toLEDs, alternator);
+          int offset = cleanDivide(x);
+          liveNeighbours = getLiveNeighbours(depth, processArray,top,bottom, mid,x);     //////////THIS NEEDS TO BE FIXED
+          int isLiving = isAlive(processArray[((IMWD/IntSize)) + offset], x % IntSize);
+          if(isLiving){
+            if(liveNeighbours < 2) {
+              changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 0);
+            }
+            else if(liveNeighbours > 3) {
+              changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 0);
+            }
+            else if((liveNeighbours == 3) || (liveNeighbours == 2)){
+              changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 1);
+            }
+          }
+          if(isLiving == 0) {
+            if(liveNeighbours == 3) changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 1)
+            else changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 0);
+          }
+        }
+      }
+
+void resetProcessArray(int processArray[3*(IMWD/IntSize)]){
+    for (int i = 0; i<3; i++){
+        for(int j = 0; j<IMWD/IntSize;j++){
+        processArray[i*(IMWD/IntSize)+j] = 0;
+      }
+    }
+}
+
+void processWorker(chanend toDist, chanend pauseWorker, chanend toLEDs, int index){
   int counter = steps;
   int pause = 0;
   int alternator =0;
   while(counter >0 ){
     toDist :> alternator;
-    uchar img[IMWD][IMHT/noWorkers];
-    uchar outimg[IMWD][IMHT/noWorkers];
-    uchar top[IMWD]; uchar bottom[IMWD];
-    recieveOverlap(toDist, top, bottom);
-    recieveWork(toDist, img);
-    initialiseOutput(outimg, img);
-    transformPixel(img,top,bottom,outimg, pauseWorker, pause, toLEDs, alternator);
-    sendOutput(toDist, outimg);
+    int overWritePart = 2; //stores which part of the array to overwrite with new values
+    int processArray[3*(IMWD/IntSize)];
+    int top = 0;
+    int mid = 1;
+    int bottom = 2;
+    int depth = 0;
+    int outputworld[ubound/noWorkers];
+    initialiseOutput(outputworld, processArray);
+    for (int y = 0; y<(IMHT/noWorkers);y++){
+        recieveOverlap(toDist, processArray);
+        transformPixel(index, processArray, depth, mid, top, bottom, outputworld, pauseWorker, pause, toLEDs, alternator);
+        depth = depth + 1;
+        mid = (mid + 1) % 3;
+        top = (top + 1) % 3;
+        bottom = (bottom + 1) % 3;
+        resetProcessArray(processArray);
+    }
+    sendOutput(toDist, outputworld);
 }
 }
 
-void sendOverlap(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
+
+//////////////////////////////////////////////////////////
+////////////////////DISTRIBUTOR///////////////////////////
+//////////////////////////////////////////////////////////
+
+/*void sendOverlap(chanend worker[noWorkers], int world[ubound]){
     for(int index = 0; index < noWorkers; index ++){
-          for(int x = 0; x< IMWD;x++){
-              int top, bottom;
+              int top;
               top = ((index*(IMHT/noWorkers) -1));
-              bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
+              //bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
+              if (top == -1) top = IMHT-1;
+              //if (bottom == IMHT) bottom = 0;
+              for (int i = 0; i < (IMWD/32);i++) {
+                  worker[index] <: world[(top*(IMWD/32))+i];
+                  worker[index] <: world[((index*IMHT)/noWorkers) + i];
+              }
+          //}
+      }
+}*/
+
+void sendOverlap(chanend worker[noWorkers], int world[ubound]){
+
+  par (int index = 0; index < noWorkers; index ++){
+
+      for(int y = ((index*IMHT)/noWorkers); y < (((index*IMHT)/noWorkers) + IMHT/noWorkers); y++){
+          int top, bottom, mid;
+          mid = y;
+              top = mid -1;
+              bottom = mid +1;
               if (top == -1) top = IMHT-1;
               if (bottom == IMHT) bottom = 0;
-
-              worker[index] <: img[x][top];
-              worker[index] <: img[x][bottom];
-          }
-      }
-}
-
-void distributeWork(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
-    for(int index =0; index<noWorkers;index++){
-          for(int y = (index*IMHT/noWorkers); y< ((index*IMHT/noWorkers) + IMHT/noWorkers); y++){
-              for(int x = 0; x <IMWD; x++){
-                  worker[index] <: img[x][y];
+              for (int i = 0; i < (IMWD/IntSize);i++) {
+                  worker[index] <: world[(top*(IMWD/IntSize))+i];
+                  worker[index] <: world[(mid*(IMWD/IntSize))+i];
+                  worker[index] <: world[(bottom*(IMWD/IntSize))+i];
               }
+          //}
+      }
+}
+}
+
+void distributeWork(chanend worker[noWorkers], int world[ubound]){
+    for(int index =0; index<noWorkers;index++){
+          for(int y = (((index*IMHT)/noWorkers)+1); y < (((index*IMHT)/noWorkers) + IMHT/noWorkers)+1; y++){
+              for(int x = 0; x <(IMWD/IntSize); x++){
+//                  printf("REACHED HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE\n");
+                  worker[index] <: world[((y%IMWD)*(IMWD/IntSize)) + x];
+              }
+             worker[index] :> int k;
           }
       }
 }
 
-void recieveFinal(chanend worker[noWorkers], uchar img[IMWD][IMHT]){
+void recieveFinal(chanend worker[noWorkers], int world[ubound]){
     for(int index =0; index<noWorkers;index++){
         int base = index*(IMHT/noWorkers);
         int interval = base + (IMHT/noWorkers);
         for(int y = base; y< interval; y++){
-            for(int x = 0; x < IMWD; x++){
-                worker[index] :> img[x][y];
+            for(int x = 0; x < (IMWD/IntSize); x++){
+                worker[index] :> world[(y*(IMWD/IntSize)) + x];
             }
         }
-    }
-}
-
-void sendFinal(chanend c_out, uchar img[IMWD][IMHT]){
-        for(int y = 0; y< IMHT; y++){
-            for(int x = 0; x < IMWD; x++){
-                c_out <: img[x][y];
-            }
-        }
-    }
-
-void initialiseIMG(chanend c_in, uchar img[IMWD][IMHT]){
-    for( int y = 0; y < IMHT; y++ ) {               //go through all lines
-        for( int x = 0; x < IMWD; x++ ) {           //go through each pixel per line
-            c_in :> img[x][y];                      //read the pixel value
-        }
+//        printf("%d RECEIVEFINALLLLLLLLLLLLLLLLLLLLLLLLLLLLL\n", index);
     }
 }
 
@@ -303,7 +393,7 @@ void getButton(chanend fromButtons, int alternator){
   fromButtons <: 4 | alternator;
 }
 
-void sendAlternator(chanend fromButtons, int alternator){
+void sendAlternator(chanend fromButtons, int alternator, chanend worker[noWorkers]){
   fromButtons <: 0 | alternator;
   if (alternator == 1) alternator = 0;
   else alternator = 1;
@@ -312,6 +402,26 @@ void sendAlternator(chanend fromButtons, int alternator){
       worker[a] <: alternator;
   }
 }
+//if anything goes wrong its here
+void unpack(int world[ubound], chanend c_out){
+    for (int y = 0; y< IMHT; y++){
+        for(int x =0; x<(IMWD/IntSize); x++){
+            for (int k = 0; k < IntSize; k++) {
+                uchar temp;
+                //int up = (y*(IMWD/32)) + x;
+                //printf("%d \n", up);
+                //int k = world[up];
+                if(isAlive(world[(y*(IMWD/IntSize)) + x],k%IntSize)){
+                     temp = 255;
+                }
+                else temp = 0;
+                c_out <: temp;
+            }
+       }
+//        printf("%d UNPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACK\n", y);
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 //
 // Start your implementation by changing this function to implement the game of life
@@ -321,47 +431,48 @@ void sendAlternator(chanend fromButtons, int alternator){
 /////////////////////////////////////////////////////////////////////////////////////////
 void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[noWorkers], chanend fromButtons)
 {
-
   int counter = steps;
+  while (counter > 0) {
+  timer keepTime;
+  unsigned long long int time = 0;
+  unsigned long long int time1 = 0;
+  unsigned long long int oneSecond = 100000000;
   int alternator = 1;
-  while(counter >0){
-  uchar img[IMWD][IMHT];
+  int world[ubound];
+//  printf("%d\n",IntSize);
+  for (int i = 0; i < ubound; i++) {
+      world[i] = 0;
+  }
+  for(int i = 30; i < 36; i++){
+//      printf("$value of clean divide %d is: %d\n",i,cleanDivide(i));
+  }
+  keepTime :> time;
+  printf("THE TIME IN THE DISTRIBUTOR IS %llu \n \n", time);
+
+  int wer = 1 << 10;
+
+//  printf("%d       fdddddddddddddddddddddddddddddddd", wer);
 
   //Starting up and wait for tilting of the xCore-200 Explorer
-  printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
   printf("Waiting for Button Click...\n");
 
 // printf( "Waiting for Board Tilt...\n" );
 //  fromAcc :> int value;
   getButton(fromButtons, alternator);
-//  int buttonPress = 0;
-//  fromButtons :> buttonPress;
-//  fromButtons <: 4 | alternator;
-
-
-
-  //Read in and do something with your image values..
-  printf( "Processing...\n" );
-  initialiseIMG(c_in, img);
-
-  sendAlternator(fromButtons, alternator);
-  //fromButtons <: 0 | alternator;
-  //if (alternator == 1) alternator = 0;
-  //else alternator = 1;
-
-  //for (int a = 0; a < noWorkers; a++) {
-  //    worker[a] <: alternator;
-  //}
-
-
-  sendOverlap(worker, img);
-  distributeWork(worker, img);
-
+  printf( "\n \n \nProcessing...\n \n \n" );
+  pack(c_in, world);
+//  printf("QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ\n");
+  sendAlternator(fromButtons, alternator, worker);
+  sendOverlap(worker, world);
+  //loop target
+//  distributeWork(worker, world);
+  //loop target
+//  printf("pppppppppppppppppppppppppppppppppppppppppppppppppppppppppp\n");
   fromButtons <: 2 | alternator;
-
-  recieveFinal(worker,img);
-  sendFinal(c_out, img);
-
+  recieveFinal(worker,world);
+  unpack(world,c_out); ///NEEDS IMPLEMENTING
+  //sendFinal(c_out, img);
+//  printf("lllllllllllllllllllllllllllllllllllllllllllllllllllllllll\n");
   fromButtons <: 0 | alternator;
   counter = counter - 1;
 
@@ -369,7 +480,14 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
 
   c_in <: 0;
   c_out <: 0;
-}
+
+  printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
+    keepTime :> time1;
+      printf("THE TIME IN THE DISTRIBUTOR IS NOW %llu \n", time1);
+      time1 = time1 - time;
+      float f = time1 / oneSecond;
+      printf("THE TIME DIFFERENCE WAS %f SECONDS\n", f);
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -381,7 +499,7 @@ void DataOutStream(char outfname[], chanend c_in)
 {
   int res;
   int counter = steps;
-  int alternator = 0;
+//  int alternator = 0;
   while (counter > 0){
   uchar line[ IMWD ];
 
@@ -396,24 +514,24 @@ void DataOutStream(char outfname[], chanend c_in)
   //Compile each line of the image and write the image line-by-line
   for( int y = 0; y < IMHT; y++ ) {
     for( int x = 0; x < IMWD; x++ ) {
+
       c_in :> line[ x ];
     }
     _writeoutline( line, IMWD );
     printf( "DataOutStream: Line written...\n" );
   }
-
   //Close the PGM image
   _closeoutpgm();
   counter -= 1;
   printf( "DataOutStream: Done...\n" );
-  if (alternator == 0){
-    strcpy(outfname, "test---.pgm");
-    alternator = 1;
-  }
-  else {
-    strcpy(outfname, "testout.pgm");
-    alternator = 0;
-  }
+  //if (alternator == 0){
+  //  strcpy(outfname, "test---.pgm");
+  //  alternator = 1;
+  //}
+  //else {
+  //  strcpy(outfname, "testout.pgm");
+  //  alternator = 0;
+  //}
   c_in :> int data;
 }
   return;
@@ -518,7 +636,7 @@ par {
     on tile[0] : showLEDs(leds, LEDButtonCom, LEDWorkerComm);
 
     par(int index = 0; index<noWorkers; index++){
-    on tile[index % 2] : processWorker(worker[index], pauseWorker[index], LEDWorkerComm[index]);
+    on tile[index % 2] : processWorker(worker[index], pauseWorker[index], LEDWorkerComm[index], index);
     }
 }
 
