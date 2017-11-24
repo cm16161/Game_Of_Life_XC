@@ -7,7 +7,7 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  ImageSize 128
+#define  ImageSize 16
 #define  IMHT ImageSize                  //image height
 #define  IMWD ImageSize                  //image width
 #define  noWorkers 4
@@ -27,8 +27,8 @@ typedef unsigned char uchar;      //using uchar as shorthand
 on tile[0] : port p_scl = XS1_PORT_1E;         //interface ports to orientation
 on tile[0] : port p_sda = XS1_PORT_1F;
 
-char infname[20] = "128x128.pgm";     //put your input image path here
-char outfname[20] = "testoutNOOT128.pgm"; //put your output image path here
+char infname[20] = "test.pgm";     //put your input image path here
+char outfname[20] = "testoutNOOT16.pgm"; //put your output image path here
 
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
@@ -264,7 +264,7 @@ void transformPixel(int index, int processArray[3*(IMWD/IntSize)],int depth, int
     int counter = 0;
         for(int x =0; x < IMWD; x++){
           counter = counter + 1;
-          pauseWorkerFunction(pauseWorker, pause, toLEDs, alternator);
+//          pauseWorkerFunction(pauseWorker, pause, toLEDs, alternator);
           int offset = cleanDivide(x);
           liveNeighbours = getLiveNeighbours(depth, processArray,top,bottom, mid,x);     //////////THIS NEEDS TO BE FIXED
           int isLiving = isAlive(processArray[((IMWD/IntSize)) + offset], x % IntSize);
@@ -280,7 +280,7 @@ void transformPixel(int index, int processArray[3*(IMWD/IntSize)],int depth, int
             }
           }
           if(isLiving == 0) {
-            if(liveNeighbours == 3) changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 1)
+            if(liveNeighbours == 3) changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 1);
             else changeBit(outputworld, (depth*(IMWD/IntSize)) + offset, x%IntSize, 0);
           }
         }
@@ -342,37 +342,33 @@ void processWorker(chanend toDist, chanend pauseWorker, chanend toLEDs, int inde
 }*/
 
 void sendOverlap(chanend worker[noWorkers], int world[ubound]){
-
   par (int index = 0; index < noWorkers; index ++){
-
       for(int y = ((index*IMHT)/noWorkers); y < (((index*IMHT)/noWorkers) + IMHT/noWorkers); y++){
           int top, bottom, mid;
           mid = y;
-              top = mid -1;
-              bottom = mid +1;
-              if (top == -1) top = IMHT-1;
-              if (bottom == IMHT) bottom = 0;
-              for (int i = 0; i < (IMWD/IntSize);i++) {
-                  worker[index] <: world[(top*(IMWD/IntSize))+i];
-                  worker[index] <: world[(mid*(IMWD/IntSize))+i];
-                  worker[index] <: world[(bottom*(IMWD/IntSize))+i];
-              }
-          //}
+          top = mid -1;
+          bottom = mid +1;
+          if (top == -1) top = IMHT-1;
+          if (bottom == IMHT) bottom = 0;
+          for (int i = 0; i < (IMWD/IntSize);i++) {
+            worker[index] <: world[(top*(IMWD/IntSize))+i];
+            worker[index] <: world[(mid*(IMWD/IntSize))+i];
+            worker[index] <: world[(bottom*(IMWD/IntSize))+i];
+          }
+        }
       }
 }
-}
 
-void distributeWork(chanend worker[noWorkers], int world[ubound]){
+/*void distributeWork(chanend worker[noWorkers], int world[ubound]){
     for(int index =0; index<noWorkers;index++){
           for(int y = (((index*IMHT)/noWorkers)+1); y < (((index*IMHT)/noWorkers) + IMHT/noWorkers)+1; y++){
               for(int x = 0; x <(IMWD/IntSize); x++){
-//                  printf("REACHED HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE\n");
                   worker[index] <: world[((y%IMWD)*(IMWD/IntSize)) + x];
               }
              worker[index] :> int k;
           }
       }
-}
+}*/
 
 void recieveFinal(chanend worker[noWorkers], int world[ubound]){
     for(int index =0; index<noWorkers;index++){
@@ -383,7 +379,6 @@ void recieveFinal(chanend worker[noWorkers], int world[ubound]){
                 worker[index] :> world[(y*(IMWD/IntSize)) + x];
             }
         }
-//        printf("%d RECEIVEFINALLLLLLLLLLLLLLLLLLLLLLLLLLLLL\n", index);
     }
 }
 
@@ -402,15 +397,11 @@ void sendAlternator(chanend fromButtons, int alternator, chanend worker[noWorker
       worker[a] <: alternator;
   }
 }
-//if anything goes wrong its here
 void unpack(int world[ubound], chanend c_out){
     for (int y = 0; y< IMHT; y++){
         for(int x =0; x<(IMWD/IntSize); x++){
             for (int k = 0; k < IntSize; k++) {
                 uchar temp;
-                //int up = (y*(IMWD/32)) + x;
-                //printf("%d \n", up);
-                //int k = world[up];
                 if(isAlive(world[(y*(IMWD/IntSize)) + x],k%IntSize)){
                      temp = 255;
                 }
@@ -418,7 +409,6 @@ void unpack(int world[ubound], chanend c_out){
                 c_out <: temp;
             }
        }
-//        printf("%d UNPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACK\n", y);
     }
 }
 
@@ -439,40 +429,24 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[no
   unsigned long long int oneSecond = 100000000;
   int alternator = 1;
   int world[ubound];
-//  printf("%d\n",IntSize);
   for (int i = 0; i < ubound; i++) {
       world[i] = 0;
   }
-  for(int i = 30; i < 36; i++){
-//      printf("$value of clean divide %d is: %d\n",i,cleanDivide(i));
-  }
   keepTime :> time;
   printf("THE TIME IN THE DISTRIBUTOR IS %llu \n \n", time);
-
   int wer = 1 << 10;
-
-//  printf("%d       fdddddddddddddddddddddddddddddddd", wer);
-
   //Starting up and wait for tilting of the xCore-200 Explorer
   printf("Waiting for Button Click...\n");
 
 // printf( "Waiting for Board Tilt...\n" );
-//  fromAcc :> int value;
   getButton(fromButtons, alternator);
   printf( "\n \n \nProcessing...\n \n \n" );
   pack(c_in, world);
-//  printf("QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ\n");
   sendAlternator(fromButtons, alternator, worker);
   sendOverlap(worker, world);
-  //loop target
-//  distributeWork(worker, world);
-  //loop target
-//  printf("pppppppppppppppppppppppppppppppppppppppppppppppppppppppppp\n");
   fromButtons <: 2 | alternator;
   recieveFinal(worker,world);
-  unpack(world,c_out); ///NEEDS IMPLEMENTING
-  //sendFinal(c_out, img);
-//  printf("lllllllllllllllllllllllllllllllllllllllllllllllllllllllll\n");
+  unpack(world,c_out);
   fromButtons <: 0 | alternator;
   counter = counter - 1;
 
@@ -499,7 +473,6 @@ void DataOutStream(char outfname[], chanend c_in)
 {
   int res;
   int counter = steps;
-//  int alternator = 0;
   while (counter > 0){
   uchar line[ IMWD ];
 
@@ -524,14 +497,6 @@ void DataOutStream(char outfname[], chanend c_in)
   _closeoutpgm();
   counter -= 1;
   printf( "DataOutStream: Done...\n" );
-  //if (alternator == 0){
-  //  strcpy(outfname, "test---.pgm");
-  //  alternator = 1;
-  //}
-  //else {
-  //  strcpy(outfname, "testout.pgm");
-  //  alternator = 0;
-  //}
   c_in :> int data;
 }
   return;
@@ -573,9 +538,7 @@ void orientation( client interface i2c_master_if i2c, chanend toDist, chanend pa
     //send signal to distributor after first tilt
     if (!tilted) {
       if (x<-20) {
-        //tilted = 1 - tilted;
         tilted = 0;
-//        toDist <: 1;
       }
     }
     if (!tilted){
