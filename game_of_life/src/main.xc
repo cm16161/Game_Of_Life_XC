@@ -7,7 +7,7 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  ImageSize 16
+#define  ImageSize 64
 #define  IMHT ImageSize                  //image height
 #define  IMWD ImageSize                  //image width
 #define  noWorkers 4
@@ -27,8 +27,8 @@ typedef unsigned char uchar;      //using uchar as shorthand
 on tile[0] : port p_scl = XS1_PORT_1E;         //interface ports to orientation
 on tile[0] : port p_sda = XS1_PORT_1F;
 
-char infname[20] = "test.pgm";     //put your input image path here
-char outfname[20] = "testoutNOOT16.pgm"; //put your output image path here
+char infname[20] = "64x64.pgm";// = fuckUpXc();//strcat(strcat(strcat("64","x"), "64"), ".pgm");     //put your input image path here
+char outfname[20] = "testout.pgm"; //put your output image path here
 
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
@@ -44,17 +44,17 @@ on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 #define FXOS8700EQ_OUT_Z_MSB 0x5
 #define FXOS8700EQ_OUT_Z_LSB 0x6
 
-int showLEDs(out port p, chanend fromButtons, chanend workerPause[noWorkers]) {
+int showLEDs(out port p, chanend fromDist, chanend workerPause[noWorkers]) {
   int pattern = 0; //1st bit...separate green LED
                //2nd bit...blue LED
                //3rd bit...green LED
                //4th bit...red LED
   while (1) {
     select {
-        case fromButtons :> pattern:
+        case workerPause[int i] :> pattern:
             p <: pattern;
             break;
-        case workerPause[int i] :> pattern:
+        case fromDist :> pattern:
             p <: pattern;
             break;
     }
@@ -62,30 +62,22 @@ int showLEDs(out port p, chanend fromButtons, chanend workerPause[noWorkers]) {
   return 0;
 }
 
-void buttonListener(in port b, chanend toDist, chanend toLEDs) {
+void buttonListener(in port b, chanend toDist) {
   int r;
-  int data;
-  int writtenback = 1;
-
+  int started = 0;
+  while (started == 0) {
+           b when pinseq(14)  :> r;    // check that no button is pressed
+           toDist <: 0; //send out that a button was pushed
+           started = 1;
+  }
   while (1) {
-      b when pinseq(15)  :> r;    // check that no button is pressed
-      b when pinsneq(15) :> r;    // check if some buttons are pressed
-      if (r == 14 && writtenback != 0) {
-          toDist <: 0; //send out that a button was pushed
-
-          toDist :> data; //confirmation of recepit = green light
-          toLEDs <: data; //display green light
-
-          toDist :> data; //terminate green light at the end of processing
-          toLEDs <: data;
-          writtenback = 0;
-      }
-      if (r == 13 && writtenback == 0) {
-          toDist :> data;
-          toLEDs <: data;
-          toDist :> data;
-          toLEDs <: data;
-          writtenback = 1;
+      select {
+          case b when pinseq(13) :> r:
+              toDist <: 1;
+              break;
+          default:
+              toDist <: 0;
+              break;
       }
   }
 }
@@ -98,40 +90,23 @@ void buttonListener(in port b, chanend toDist, chanend toLEDs) {
 void DataInStream(char infname[], chanend c_out)
 {
   int counter = steps;
-  int alternator = 0;
-  while (counter >0){
     int res;
     uchar line[ IMWD ];
     printf( "DataInStream: Start...\n" );
-
-    //Open PGM file
     res = _openinpgm( infname, IMWD, IMHT );
     if( res ) {
       printf( "DataInStream: Error openening %s\n.", infname );
       return;
     }
-
-  //Read image line-by-line and send byte by byte to channel c_out
   for( int y = 0; y < IMHT; y++ ) {
     _readinline( line, IMWD );
     for( int x = 0; x < IMWD; x++ ) {
       c_out <: line[ x ];
-//      if (line[x] == 255)printf("1");
-  //    else printf("0");
     }
-//    printf("\n");
   }
-
-  //Close PGM image file
   _closeinpgm();
   printf( "DataInStream: Done...\n" );
   counter = counter - 1;
-  if (alternator == 0) {
-      strcpy(infname,"testout.pgm");
-      alternator = 1;
-  }
-  c_out :> int data;
-}
   return;
 }
 
@@ -165,31 +140,43 @@ int cleanDivide(int x) {
     return counter;
 }
 
+int liveCellCount(int outputworld[ubound/noWorkers]){
+    int liveCell = 0;
+    for (int y = 0; y< IMHT/noWorkers; y++){
+        for(int x =0; x<(IMWD/IntSize); x++){
+            for (int k = 0; k < IntSize; k++) {
+                if(isAlive(outputworld[(y*(IMWD/IntSize)) + x],k%IntSize)){
+                     liveCell++;
+                }
+            }
+       }
+    }
+return liveCell;
+}
+
 int getLiveNeighbours(int index, int processArray[3*(IMWD/IntSize)], int top, int bottom , int mid, int x){
 int counter = 0;
-int flagup, flagdown;
+int flag;
 for(int j = -1; j<2; j++){
     for(int i =-1; i<2; i++){
-        flagup = 0;
-        flagdown = 0;
+        flag = 0;
         int xneighbour = (x+i) ;
         int yneighbour;
         if(xneighbour == -1) xneighbour = IMWD -1;
         if(xneighbour == IMWD) xneighbour = 0;
-
-        if(j == -1) {yneighbour = top; flagup =1;}
-        else if(j== 1) {yneighbour = bottom; flagdown = 1;}
+        if(j == -1) {yneighbour = top; flag =1;}
+        else if(j== 1) {yneighbour = bottom; flag = -1;}
         else if(j == 0) {yneighbour = mid;}
         if((i != 0) || (j!=0)){
             int passTop = cleanDivide(xneighbour);
-            if(flagup == 1){
+            if(flag == 1){
                 if(isAlive(processArray[passTop], xneighbour % IntSize)) counter++;
-                flagup =0;
+                flag =0;
             }
-            else if(flagdown == 1){
+            else if(flag == -1){
                 int passBottom = cleanDivide(xneighbour);
                 if(isAlive(processArray[(2*(IMWD/IntSize))+passBottom], xneighbour % IntSize)) counter++;
-                flagdown =0;
+                flag =0;
             }
             else{
                 int passY = cleanDivide(xneighbour);
@@ -198,8 +185,6 @@ for(int j = -1; j<2; j++){
         }
     }
 }
-//printf("$%d\n", counter);
-
 return counter;
 }
 
@@ -213,7 +198,7 @@ void sendOutput(chanend toDist, int outputworld[ubound/noWorkers]){
     }
 }
 
-void recieveOverlap(chanend toDist, int processArray[3*(IMWD/IntSize)]){
+void recieveWork(chanend toDist, int processArray[3*(IMWD/IntSize)]){
     for (int x = 0; x <(IMWD/IntSize); x++){
         toDist :> processArray[x];
         toDist :> processArray[(IMWD/IntSize)+x];
@@ -241,14 +226,16 @@ void initialiseOutput(int outputworld[ubound/noWorkers], int processArray[3*(IMH
     }
 }
 
-void pauseWorkerFunction(chanend pauseWorker, int pause, chanend toLEDs, int alternator){
+/*void pauseWorkerFunction(chanend pauseWorker, int pause, chanend toLEDs, int alternator){
   pauseWorker :> pause;
+//  printf("$PAUSEWORKER FUNCTION!!!!!!!!!!!!!!!!!!!!!!!\n");
   while (pause == 1) {
+        printf("$PAUSEWORKER FUNCTION!!!!!!!!!!!!!!!!!!!!!!!\n");
       pauseWorker :> pause;
       toLEDs <: 8 | alternator;
   }
   toLEDs <: 0 | alternator;
-}
+}*/
 
 void changeBit(int outputworld[ubound/noWorkers], int outputWorldUnit, int x, int change){
     if (change == 1) {
@@ -264,7 +251,6 @@ void transformPixel(int index, int processArray[3*(IMWD/IntSize)],int depth, int
     int counter = 0;
         for(int x =0; x < IMWD; x++){
           counter = counter + 1;
-//          pauseWorkerFunction(pauseWorker, pause, toLEDs, alternator);
           int offset = cleanDivide(x);
           liveNeighbours = getLiveNeighbours(depth, processArray,top,bottom, mid,x);     //////////THIS NEEDS TO BE FIXED
           int isLiving = isAlive(processArray[((IMWD/IntSize)) + offset], x % IntSize);
@@ -294,11 +280,13 @@ void resetProcessArray(int processArray[3*(IMWD/IntSize)]){
     }
 }
 
-void processWorker(chanend toDist, chanend pauseWorker, chanend toLEDs, int index){
+void processWorker(chanend toDist,chanend pauseWorker, chanend toLEDs, int index, chanend toTimer){
   int counter = steps;
   int pause = 0;
   int alternator =0;
-  while(counter >0 ){
+  int rounds =0;
+  float time = 0;
+  while(counter >0){
     toDist :> alternator;
     int overWritePart = 2; //stores which part of the array to overwrite with new values
     int processArray[3*(IMWD/IntSize)];
@@ -309,7 +297,21 @@ void processWorker(chanend toDist, chanend pauseWorker, chanend toLEDs, int inde
     int outputworld[ubound/noWorkers];
     initialiseOutput(outputworld, processArray);
     for (int y = 0; y<(IMHT/noWorkers);y++){
-        recieveOverlap(toDist, processArray);
+        pauseWorker :> pause;
+        if(pause ==1){
+            printf("Number of Rounds Processed: %d\n", (rounds));
+            printf("Number of Live Cells Processed by Worker %d: %d\n",index, liveCellCount(outputworld));
+            if(index == 0) {
+                printf("Time elapsed is: %f\n", time/(float)1000000000);
+            }
+        }
+        while (pause == 1) {
+            pauseWorker :> pause;
+            toLEDs <: 8 | alternator;
+        }
+        pause = 0;
+        toLEDs <: 0 | alternator;
+        recieveWork(toDist, processArray);
         transformPixel(index, processArray, depth, mid, top, bottom, outputworld, pauseWorker, pause, toLEDs, alternator);
         depth = depth + 1;
         mid = (mid + 1) % 3;
@@ -317,31 +319,13 @@ void processWorker(chanend toDist, chanend pauseWorker, chanend toLEDs, int inde
         bottom = (bottom + 1) % 3;
         resetProcessArray(processArray);
     }
+    rounds++;
     sendOutput(toDist, outputworld);
+    toTimer :> time;
 }
 }
 
-
-//////////////////////////////////////////////////////////
-////////////////////DISTRIBUTOR///////////////////////////
-//////////////////////////////////////////////////////////
-
-/*void sendOverlap(chanend worker[noWorkers], int world[ubound]){
-    for(int index = 0; index < noWorkers; index ++){
-              int top;
-              top = ((index*(IMHT/noWorkers) -1));
-              //bottom = ((index*IMHT/noWorkers) +(IMHT/noWorkers));
-              if (top == -1) top = IMHT-1;
-              //if (bottom == IMHT) bottom = 0;
-              for (int i = 0; i < (IMWD/32);i++) {
-                  worker[index] <: world[(top*(IMWD/32))+i];
-                  worker[index] <: world[((index*IMHT)/noWorkers) + i];
-              }
-          //}
-      }
-}*/
-
-void sendOverlap(chanend worker[noWorkers], int world[ubound]){
+void distributeWork(chanend worker[noWorkers], int world[ubound]){
   par (int index = 0; index < noWorkers; index ++){
       for(int y = ((index*IMHT)/noWorkers); y < (((index*IMHT)/noWorkers) + IMHT/noWorkers); y++){
           int top, bottom, mid;
@@ -359,17 +343,6 @@ void sendOverlap(chanend worker[noWorkers], int world[ubound]){
       }
 }
 
-/*void distributeWork(chanend worker[noWorkers], int world[ubound]){
-    for(int index =0; index<noWorkers;index++){
-          for(int y = (((index*IMHT)/noWorkers)+1); y < (((index*IMHT)/noWorkers) + IMHT/noWorkers)+1; y++){
-              for(int x = 0; x <(IMWD/IntSize); x++){
-                  worker[index] <: world[((y%IMWD)*(IMWD/IntSize)) + x];
-              }
-             worker[index] :> int k;
-          }
-      }
-}*/
-
 void recieveFinal(chanend worker[noWorkers], int world[ubound]){
     for(int index =0; index<noWorkers;index++){
         int base = index*(IMHT/noWorkers);
@@ -382,14 +355,13 @@ void recieveFinal(chanend worker[noWorkers], int world[ubound]){
     }
 }
 
-void getButton(chanend fromButtons, int alternator){
+void getButton(chanend fromButtons, chanend display, int alternator){
   int buttonPress = 0;
   fromButtons :> buttonPress;
-  fromButtons <: 4 | alternator;
+  display <: 4 | alternator;
 }
 
-void sendAlternator(chanend fromButtons, int alternator, chanend worker[noWorkers]){
-  fromButtons <: 0 | alternator;
+void sendAlternator(int alternator, chanend worker[noWorkers]){
   if (alternator == 1) alternator = 0;
   else alternator = 1;
 
@@ -412,56 +384,90 @@ void unpack(int world[ubound], chanend c_out){
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-//
-// Start your implementation by changing this function to implement the game of life
-// by farming out parts of the image to worker threads who implement it...
-// Currently the function just inverts the image
-//
-/////////////////////////////////////////////////////////////////////////////////////////
-void distributor(chanend c_in, chanend c_out, chanend fromAcc, chanend worker[noWorkers], chanend fromButtons)
+void initialiseWorld(int world[ubound]){
+    for (int i = 0; i < ubound; i++) {
+          world[i] = 0;
+      }
+}
+
+void distributor(chanend toLEDs, chanend c_in, chanend c_out, chanend fromAcc, chanend worker[noWorkers], chanend fromButtons, chanend toTimer)
 {
   int counter = steps;
-  while (counter > 0) {
-  timer keepTime;
-  unsigned long long int time = 0;
-  unsigned long long int time1 = 0;
-  unsigned long long int oneSecond = 100000000;
-  int alternator = 1;
+  float time = 0;
+  float oneSecond = 100000000;
+  int alternator = 0;
   int world[ubound];
-  for (int i = 0; i < ubound; i++) {
-      world[i] = 0;
-  }
-  keepTime :> time;
-  printf("THE TIME IN THE DISTRIBUTOR IS %llu \n \n", time);
-  int wer = 1 << 10;
-  //Starting up and wait for tilting of the xCore-200 Explorer
+  int receival = 1;
   printf("Waiting for Button Click...\n");
-
-// printf( "Waiting for Board Tilt...\n" );
-  getButton(fromButtons, alternator);
-  printf( "\n \n \nProcessing...\n \n \n" );
+  initialiseWorld(world);
+  /*for (int i = 0; i < ubound; i++) {
+      world[i] = 0;
+  }*/
+  getButton(fromButtons, toLEDs, alternator);
   pack(c_in, world);
-  sendAlternator(fromButtons, alternator, worker);
-  sendOverlap(worker, world);
-  fromButtons <: 2 | alternator;
-  recieveFinal(worker,world);
-  unpack(world,c_out);
-  fromButtons <: 0 | alternator;
-  counter = counter - 1;
-
-  printf( "\nOne processing round completed...\n" );
-
-  c_in <: 0;
-  c_out <: 0;
-
-  printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
-    keepTime :> time1;
-      printf("THE TIME IN THE DISTRIBUTOR IS NOW %llu \n", time1);
-      time1 = time1 - time;
-      float f = time1 / oneSecond;
-      printf("THE TIME DIFFERENCE WAS %f SECONDS\n", f);
+  toLEDs <: 0 | alternator;
+  while (counter > 0) {
+      printf( "Processing...\n" );
+      toTimer <: 1;
+      sendAlternator(alternator, worker);
+      distributeWork(worker, world);
+      recieveFinal(worker,world);
+      toTimer <: 0;
+      toTimer :> time;
+      printf("THE TIME DIFFERENCE WAS %lf SECONDS\n", time/oneSecond);
+      fromButtons :> receival;
+      if ((receival == 1) || (counter ==1)) {toLEDs <: 2 | alternator;
+      unpack(world,c_out);}
+      toLEDs <: 0 | alternator;
+      counter = counter - 1;
+      printf( "\nOne processing round completed...\n" );
   }
+}
+
+
+
+///////////////////////////////////////////////
+///////////////  TIMER  ///////////////////////
+///////////////////////////////////////////////
+
+void recordTime(chanend toDist, chanend toWorker[noWorkers]){
+    float total = 0;
+    unsigned int int_max = 4294967295;
+    unsigned int getTime = 0, running = 1, baseTime = 0, previous = 0, period = 1000000000;
+    timer t;
+    while(1){
+        toDist :> running;
+        t :> getTime;
+        baseTime = getTime;
+        previous = baseTime;
+        select {
+            case t when timerafter(getTime + period) :> void:
+                t :> getTime;
+                if (getTime < previous){
+                    float tempContainer = (int_max - previous);
+                     total = total + (tempContainer - getTime);
+                } else {
+                    total = total + period;
+                }
+                previous = getTime;
+                break;
+            case toDist :> running:
+                t :> getTime;
+                if(getTime < previous){
+                    float tempContainer = (int_max - previous);
+                    total = total + (tempContainer - getTime);
+                } else {
+                    total = total + (float)(getTime - previous);
+                }
+                previous = getTime;
+                toDist <: total;
+
+                break;
+        }
+        for (int i = 0; i<noWorkers; i++){
+                    toWorker[i] <: total;
+                }
+   }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -491,15 +497,15 @@ void DataOutStream(char outfname[], chanend c_in)
       c_in :> line[ x ];
     }
     _writeoutline( line, IMWD );
-    printf( "DataOutStream: Line written...\n" );
+//    printf( "DataOutStream: Line written...\n" );
   }
   //Close the PGM image
   _closeoutpgm();
   counter -= 1;
   printf( "DataOutStream: Done...\n" );
-  c_in :> int data;
 }
   return;
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -536,13 +542,9 @@ void orientation( client interface i2c_master_if i2c, chanend toDist, chanend pa
     int x = read_acceleration(i2c, FXOS8700EQ_OUT_X_MSB);
 
     //send signal to distributor after first tilt
-    if (!tilted) {
-      if (x<-20) {
-        tilted = 0;
-      }
-    }
+
     if (!tilted){
-      if(x <- 20){
+      if(x < -20){
         tilted =  1;
         for (int i = 0; i < noWorkers; i++) {
           pauseWorker[i] <: 1;
@@ -585,21 +587,24 @@ i2c_master_if i2c[1];               //interface to orientation
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
 chan worker[noWorkers];
 chan buttonCom;
-chan LEDButtonCom;
 chan pauseWorker[noWorkers];
 chan LEDWorkerComm[noWorkers];
+chan distTimer;
+chan LEDsDist;
+chan workerTimer[noWorkers];
 
 par {
     on tile[0] : i2c_master(i2c, 1, p_scl, p_sda, 10);   //server thread providing orientation data
     on tile[1] : orientation(i2c[0],c_control, pauseWorker);        //client thread reading orientation data
     on tile[0] : DataInStream(infname, c_inIO);          //thread to read in a PGM image
     on tile[0] : DataOutStream(outfname, c_outIO);       //thread to write out a PGM image
-    on tile[1] : distributor(c_inIO, c_outIO, c_control, worker, buttonCom);//thread to coordinate work on image
-    on tile[0] : buttonListener(buttons, buttonCom, LEDButtonCom);
-    on tile[0] : showLEDs(leds, LEDButtonCom, LEDWorkerComm);
+    on tile[1] : distributor(LEDsDist, c_inIO, c_outIO, c_control, worker, buttonCom, distTimer);//thread to coordinate work on image
+    on tile[0] : buttonListener(buttons, buttonCom);
+    on tile[0] : showLEDs(leds, LEDsDist, LEDWorkerComm);
+    on tile[0] : recordTime(distTimer, workerTimer);
 
     par(int index = 0; index<noWorkers; index++){
-    on tile[index % 2] : processWorker(worker[index], pauseWorker[index], LEDWorkerComm[index], index);
+    on tile[index % 2] : processWorker(worker[index], pauseWorker[index], LEDWorkerComm[index], index, workerTimer[index]);
     }
 }
 
