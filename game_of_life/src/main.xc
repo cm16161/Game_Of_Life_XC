@@ -7,12 +7,12 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  ImageSize 64
+#define  ImageSize 16
 #define  IMHT ImageSize                  //image height
 #define  IMWD ImageSize                  //image width
 #define  noWorkers 4
 
-#define  steps 1
+#define  steps 100
 
 #if(ImageSize % 32 == 0)
     #define IntSize 32
@@ -27,8 +27,8 @@ typedef unsigned char uchar;      //using uchar as shorthand
 on tile[0] : port p_scl = XS1_PORT_1E;         //interface ports to orientation
 on tile[0] : port p_sda = XS1_PORT_1F;
 
-char infname[20] = "64x64.pgm";// = fuckUpXc();//strcat(strcat(strcat("64","x"), "64"), ".pgm");     //put your input image path here
-char outfname[20] = "testout.pgm"; //put your output image path here
+char infname[20] = "test.pgm";// = fuckUpXc();//strcat(strcat(strcat("64","x"), "64"), ".pgm");     //put your input image path here
+char outfname[20] = "junk.pgm"; //put your output image path here
 
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
@@ -478,8 +478,8 @@ void recordTime(chanend toDist, chanend toWorker[noWorkers]){
 void DataOutStream(char outfname[], chanend c_in)
 {
   int res;
-  int counter = steps;
-  while (counter > 0){
+//  int counter = steps;
+//  while (counter > 1){
   uchar line[ IMWD ];
 
   //Open PGM file
@@ -501,9 +501,9 @@ void DataOutStream(char outfname[], chanend c_in)
   }
   //Close the PGM image
   _closeoutpgm();
-  counter -= 1;
+//  counter -= 1;
   printf( "DataOutStream: Done...\n" );
-}
+//}
   return;
 
 }
