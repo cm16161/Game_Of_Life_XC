@@ -7,12 +7,12 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  ImageSize 32      //define the dimensions of the image
+#define  ImageSize 64      //define the dimensions of the image
 #define  IMHT ImageSize    //image height
 #define  IMWD ImageSize    //image width
 #define  noWorkers 4       //defines the number of worker threads that process the image pixels
 
-#define  steps 100          //defines how many rounds we do game of life for
+#define  steps 200          //defines how many rounds we do game of life for
 
 #if(ImageSize % 32 == 0)   //macro that dynamically decides on size of bit packing internpretation
     #define IntSize 32     //if the image is large, aka greater than 32, interpret each pack as 32 bits
@@ -42,17 +42,17 @@ on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 #define FXOS8700EQ_OUT_Z_LSB 0x6
 
 //function that routes a request to the LEDs
-int showLEDs(out port p, chanend fromDist, chanend workerPause[noWorkers]) {
+int showLEDs(out port p, chanend fromDist, chanend fromOrient) {
   int pattern = 0; //1st bit...separate green LED
                //2nd bit...blue LED
                //3rd bit...green LED
                //4th bit...red LED
   while (1) {
     select {   //receive a bit pattern from the different thread
-        case workerPause[int i] :> pattern:  //conveniently pack the workers into one case with [int i]
-            p <: pattern;  //dispatch the pattern
-            break;
         case fromDist :> pattern:  //received from distributor
+            p <: pattern;
+            break;
+        case fromOrient :> pattern:
             p <: pattern;
             break;
     }
@@ -74,12 +74,16 @@ void buttonListener(in port b, chanend toDist) { //connection to the button PINS
 //function that assigns the file to access based on img size
 void assignFileName(char infname[20]) {
     int myImgSize = IMWD;
-    char temp[10]; //need a temporary array to copy the image size into as a string
-    sprintf(infname, "%d", myImgSize); //int -> string
-    strcpy(temp, infname); //store conversion
-    strcat(infname, "x"); //"(img)x"
-    strcat(infname, temp); //"(img)x(img)"
-    strcat(infname, ".pgm"); //(img)x(img).pgm"
+    if (IMWD == 16) {
+        strcpy(infname, "test.pgm");
+    } else {
+        char temp[10]; //need a temporary array to copy the image size into as a string
+        sprintf(infname, "%d", myImgSize); //int -> string
+        strcpy(temp, infname); //store conversion
+        strcat(infname, "x"); //"(img)x"
+        strcat(infname, temp); //"(img)x(img)"
+        strcat(infname, ".pgm"); //(img)x(img).pgm"
+    }
 }
 
 //function that reads in the data from the file (executed once only)
@@ -99,7 +103,6 @@ void DataInStream(chanend c_out)
       return;
     }
 
-
     //read in the image values as pixels from the target file
     for( int y = 0; y < IMHT; y++ ) {
         _readinline( line, IMWD );
@@ -107,7 +110,6 @@ void DataInStream(chanend c_out)
             c_out <: line[ x ];
         }
     }
-
     _closeinpgm();
     printf( "DataInStream: Done...\n" );
     return;
@@ -228,7 +230,7 @@ void changeBit(int outputworld[ubound/noWorkers], int outputWorldUnit, int x, in
 }
 
 //function that processes a row of the output world
-void transformPixel(int index, int processArray[3*(IMWD/IntSize)],int depth, int mid, int top, int bottom, int outputworld[ubound/noWorkers]){
+void transformPixel(int processArray[3*(IMWD/IntSize)],int depth, int mid, int top, int bottom, int outputworld[ubound/noWorkers]){
         for(int x =0; x < IMWD; x++){ //loop for all bits in the row
           int offset = cleanDivide(x); //get the offset in the row
           int liveNeighbours = getLiveNeighbours(depth, processArray,top,bottom, mid,x); //get neighbours of bit
@@ -252,42 +254,48 @@ void transformPixel(int index, int processArray[3*(IMWD/IntSize)],int depth, int
     return {depth, mid, top, bottom, overWritePart};
 }
 
-void pauseWorkerManager(float time, chanend pauseWorker, int pause, int index, int outputworld[ubound/noWorkers], int rounds, chanend toLEDs, int alternator) {
-    pauseWorker :> pause;
-    if(pause ==1){
+//handle a pause request from the user
+void pauseWorkerManager(int alternator, float time, chanend pauseWorker, int pause, int index, int outputworld[ubound/noWorkers], int rounds) {
+    pauseWorker :> pause; //get the orientation command
+    pauseWorker <: alternator;
+    if(pause ==1){ //commanded to pause
+        //print cells in the workers world
         printf("Number of Live Cells Processed by Worker %d: %d\n",index, liveCellCount(outputworld));
-        if(index == 0) {
-            printf("Time elapsed is: %f\n", time/(float)1000000000);
+        if(index == 0) { //only worker one may print the time and rounds
+            printf("Time elapsed is: %f\n", time);
             printf("Number of Rounds Processed: %d\n", (rounds));
         }
-        while (pause == 1) {
-            pauseWorker :> pause;
-            toLEDs <: 8 | alternator;
+        while (pause == 1) { //hang the program until the user cancels the pause
+            select { case pauseWorker :> pause: pauseWorker <: alternator;break;} //receive command
         }
     }
 }
 
-void processWorker(chanend toDist,chanend pauseWorker, chanend toLEDs, int index, chanend toTimer){
+
+//process that handles the worker threads
+void processWorker(chanend toDist,chanend pauseWorker, int index, chanend toTimer){
   int counter = steps, pause = 0, alternator =0, rounds =0;
-  float time = 0;
+  float time = 0; //hold time from timing thread
   while(counter >0){
-    toDist :> alternator;
-    int processArray[3*(IMWD/IntSize)], outputworld[ubound/noWorkers];
-    int top = 0, mid = 1, bottom = 2, depth = 0, overWritePart = 2;
-    initialiseArrays(outputworld, processArray);
-    recieveWork(toDist, processArray, 0);
+    toDist :> alternator; //receive the alternator from the distributor
+    int processArray[3*(IMWD/IntSize)], outputworld[ubound/noWorkers]; //declarearrays
+    int top = 0, mid = 1, bottom = 2, depth = 0, overWritePart = 2; //declare index variables for process array
+    initialiseArrays(outputworld, processArray);// initialise the wolrd arrays
+    recieveWork(toDist, processArray, 0); //receive the inital 2 rows from the world to proces
     recieveWork(toDist, processArray, 1);
-    for (int y = 0; y<(IMHT/noWorkers);y++){
-        pauseWorkerManager(time, pauseWorker, pause, index, outputworld, rounds,toLEDs,alternator);
+    for (int y = 0; y<(IMHT/noWorkers);y++){ //loop for all of the rows
+        //manage a pause request
+        pauseWorkerManager(alternator, time, pauseWorker, pause, index, outputworld, rounds);
         pause = 0;
-        toLEDs <: 0 | alternator;
-        recieveWork(toDist, processArray, overWritePart);
-        transformPixel(index, processArray, depth, mid, top, bottom, outputworld);
+        //toLEDs <: 0 | alternator; //reset the LED in case of pause
+        recieveWork(toDist, processArray, overWritePart); //receive the next row of the world to process
+        transformPixel(processArray, depth, mid, top, bottom, outputworld); //process the row
+        //reset the indexing variabls
         {depth, mid, top, bottom, overWritePart} = shiftIndices(depth, mid, top, bottom, overWritePart);
     }
     rounds++;
     sendOutput(toDist, outputworld);
-    toTimer :> time;
+    toTimer :> time; //get updated time from timer
 }
 }
 
@@ -326,10 +334,6 @@ void getButton(chanend fromButtons, chanend display, int alternator){
 }
 
 void sendAlternator(int alternator, chanend worker[noWorkers]){
-  //set the alternator (aka dark green flashing LED)
-  if (alternator == 1) alternator = 0;
-  else alternator = 1;
-
   //send the alternator to the workers
   for (int a = 0; a < noWorkers; a++) {
       worker[a] <: alternator;
@@ -377,8 +381,7 @@ void buttonManager(chanend c_out, chanend fromButtons, chanend toLEDs, int recei
     }
 }
 
-void distributor(chanend toLEDs, chanend c_in, chanend c_out, chanend fromAcc, chanend worker[noWorkers], chanend fromButtons, chanend toTimer)
-{
+void distributor(chanend toLEDs, chanend c_in, chanend c_out, chanend worker[noWorkers], chanend fromButtons, chanend toTimer){
   int counter = steps; //control the loop
   float time = 0;
   float oneSecond = 100000000;
@@ -403,46 +406,45 @@ void distributor(chanend toLEDs, chanend c_in, chanend c_out, chanend fromAcc, c
       buttonManager(c_out, fromButtons, toLEDs, receival, alternator, counter, world); //check for write request
       counter = counter - 1;
       printf( "\nOne processing round completed...\n" );
+      //set the alternator (aka dark green flashing LED)
+      if (alternator == 1) alternator = 0; else alternator = 1;
   }
   uchar auth = 0; //refuse authorisation to open file for next round
   c_out <: auth;
 }
 
+//timer function
 void recordTime(chanend toDist, chanend toWorker[noWorkers]){
-    float total = 0;
-    unsigned int int_max = 4294967295;
+    float total = 0; //stores the time
+    unsigned int int_max = 4294967295; //needed for calcualtions in overflow
+    //declare the running time variables
     unsigned int getTime = 0, running = 1, baseTime = 0, previous = 0, period = 1000000000;
     timer t;
-    while(1){
-        toDist :> running;
-        t :> getTime;
-        baseTime = getTime;
+    while(1){ //loop indefinitely
+        toDist :> running; //receive a command to start timing
+        t :> getTime; //get the time
+        baseTime = getTime; //calculate our base and our previous time value
         previous = baseTime;
         select {
-            case t when timerafter(getTime + period) :> void:
-                t :> getTime;
-                if (getTime < previous){
-                    float tempContainer = (int_max - previous);
-                     total = total + (tempContainer - getTime);
-                } else {
-                    total = total + period;
-                }
-                previous = getTime;
+            case t when timerafter(getTime + period) :> void: //wait until 10 seconds have passed
+                t :> getTime; //update time
+                if (getTime < previous){ //check for overlfow
+                    float tempContainer = (int_max - previous); //split the calulation
+                    total = total + (tempContainer - getTime); //update the overall time
+                } else total = total + period; //no overlfow, then normally add the time
+                previous = getTime; //set previous time
                 break;
-            case toDist :> running:
-                t :> getTime;
-                if(getTime < previous){
-                    float tempContainer = (int_max - previous);
-                    total = total + (tempContainer - getTime);
-                } else {
-                    total = total + (float)(getTime - previous);
-                }
-                previous = getTime;
-                toDist <: total;
-
+            case toDist :> running: //termination command received from distributor
+                t :> getTime; //get updated time
+                if(getTime < previous){ //check for overflow
+                    float tempContainer = (int_max - previous); //split the calculation
+                    total = total + (tempContainer - getTime); //update total
+                } else total = total + (float)(getTime - previous); //no overflow = normal addition
+                previous = getTime; //update the previous time vale
+                toDist <: total; //dispatch the time to the distributor
                 break;
         }
-        for (int i = 0; i<noWorkers; i++){
+        for (int i = 0; i<noWorkers; i++){ //send the time to the workers
             toWorker[i] <: total;
         }
    }
@@ -451,15 +453,13 @@ void recordTime(chanend toDist, chanend toWorker[noWorkers]){
 void DataOutStream(chanend c_in)
 {
   int res;
-  char outfname[20] = "junkk.pgm"; //put your output image path here
+  char outfname[20] = "testout.pgm"; //put your output image path here
   uchar distAuth = 1; //authorisation to write from the distributor
   while (1){
       uchar line[ IMWD ];
+      printf( "DataOutStream: Start...\n" );
       c_in :> distAuth; //receive an authorisation to open the file. given when writing needed.
-      if (distAuth == 1){
-          printf( "DataOutStream: Start...\n" );
-          res = _openoutpgm( outfname, IMWD, IMHT );
-      }
+      if (distAuth == 1) res = _openoutpgm( outfname, IMWD, IMHT );
       if( res ) { //deal with error
           printf( "DataOutStream: Error opening %s\n.", outfname );
           return;
@@ -481,103 +481,90 @@ void DataOutStream(chanend c_in)
   return;
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-//
-// Initialise and  read orientation, send first tilt event to channel
-//
-/////////////////////////////////////////////////////////////////////////////////////////
-void orientation( client interface i2c_master_if i2c, chanend toDist, chanend pauseWorker[noWorkers]) {
+//command function for pausing
+void commandWorkerPause(int x, int running, chanend pauseWorker[noWorkers], client interface i2c_master_if i2c, chanend orientLED) {
+    running = 1; //the program hold loop should be active
+    int alternator = 0;
+    if (x <= -50) { //the user has tilted the board upwards to pause
+        while(running == 1) { //loop until the user tilts down
+            for (int i = 0; i<noWorkers; i++){ //dispatch commands
+                pauseWorker[i] <: 1;
+                pauseWorker[i] :> alternator;
+                orientLED <: 8 | alternator;
+
+            }
+            x = read_acceleration(i2c, FXOS8700EQ_OUT_X_MSB); //recheck what the user is doing
+            if (x >= 50) { //check if board swung downwards
+                running = 0; //exit loop
+                for (int i = 0; i<noWorkers; i++){
+                    pauseWorker[i] <: 0; //activate workers
+                    pauseWorker[i] :> alternator;
+                    orientLED <: 0 | alternator;
+                }
+            }
+        }
+    }
+    for (int i = 0; i<noWorkers; i++){ //the worker should continue
+        pauseWorker[i] <: 0; //activate workers
+        pauseWorker[i] :> alternator;
+        orientLED <: 0 | alternator;
+    }
+}
+
+void orientation( client interface i2c_master_if i2c, chanend pauseWorker[noWorkers], chanend toOrient) {
   i2c_regop_res_t result;
   char status_data = 0;
-  int tilted = 0;
-
+  int running = 1; //variable used to hold the program on a pause
   // Configure FXOS8700EQ
   result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_XYZ_DATA_CFG_REG, 0x01);
   if (result != I2C_REGOP_SUCCESS) {
     printf("I2C write reg failed\n");
   }
-
   // Enable FXOS8700EQ
   result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_CTRL_REG_1, 0x01);
   if (result != I2C_REGOP_SUCCESS) {
     printf("I2C write reg failed\n");
   }
-
   //Probe the orientation x-axis forever
   while (1) {
-
     //check until new orientation data is available
     do {
       status_data = i2c.read_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_DR_STATUS, result);
     } while (!status_data & 0x08);
-
     //get new x-axis tilt value
     int x = read_acceleration(i2c, FXOS8700EQ_OUT_X_MSB);
 
-    //send signal to distributor after first tilt
-
-    if (!tilted){
-      if(x <= -25){
-        tilted =  1;
-        for (int i = 0; i < noWorkers; i++) {
-          pauseWorker[i] <: 1;
-        }
-      }
-      else {
-        for (int i = 0; i < noWorkers; i++) {
-          pauseWorker[i] <: 0;
-        }
-      }
-    }
-    else {
-      if(x >= 25){
-        tilted = 0;
-        for (int i = 0; i< noWorkers; i++){
-          pauseWorker[i] <: 0;
-        }
-      }
-      else {
-        for (int i = 0; i<noWorkers; i++){
-          pauseWorker[i] <: 1;
-        }
-      }
-    }
-    }
+    //function to check if user has tilted the board (and hence paused the game)
+    commandWorkerPause(x, running, pauseWorker, i2c, toOrient);
+  }
   }
 
-
-/////////////////////////////////////////////////////////////////////////////////////////
-//
-// Orchestrate concurrent system and start up all threads
-//
-/////////////////////////////////////////////////////////////////////////////////////////
 int main(void) {
-
     i2c_master_if i2c[1];               //interface to orientation
 
-    chan c_inIO, c_outIO, c_control;  //channels for IO
+    chan c_inIO, c_outIO;  //channels for IO
     chan worker[noWorkers];           //channels between distributor and the workers
     chan buttonCom;                   //communication between distributor and the buttons
     chan pauseWorker[noWorkers];      //channels to pause the worker on a tilt
-    chan LEDWorkerComm[noWorkers];    //channels to light the LEDs fron the workers
     chan distTimer;                   //channels to access timer from distributor
     chan LEDsDist;                    //distributor LED channel
     chan workerTimer[noWorkers];
+    chan orientLED;
 
     par {
         on tile[0] : i2c_master(i2c, 1, p_scl, p_sda, 10);   //server thread providing orientation data
-        on tile[1] : orientation(i2c[0],c_control, pauseWorker);        //client thread reading orientation data
+        on tile[1] : orientation(i2c[0], pauseWorker,orientLED);        //client thread reading orientation data
         on tile[0] : DataInStream(c_inIO);          //thread to read in a PGM image
         on tile[0] : DataOutStream(c_outIO);       //thread to write out a PGM image
-        on tile[1] : distributor(LEDsDist, c_inIO, c_outIO, c_control, worker, buttonCom, distTimer);//thread to coordinate work on image
+        on tile[1] : distributor(LEDsDist, c_inIO, c_outIO, worker, buttonCom, distTimer);//thread to coordinate work on image
         on tile[0] : buttonListener(buttons, buttonCom); //button port thread
-        on tile[0] : showLEDs(leds, LEDsDist, LEDWorkerComm); //LED port thread
+        on tile[0] : showLEDs(leds, LEDsDist, orientLED); //LED port thread
         on tile[0] : recordTime(distTimer, workerTimer); //timer thread
 
         //run a number of workers in parallel
         par(int index = 0; index<noWorkers; index++){
             on tile[index % 2] : processWorker(worker[index], pauseWorker[index], \
-                    LEDWorkerComm[index], index, workerTimer[index]);
+                    index, workerTimer[index]);
         }
     }
   return 0;
